@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: ltw_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-logistics}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-logistics_control_tower}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-logistics}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ltw_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ltw_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-logistics}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-logistics_control_tower}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-logistics}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-logistics_control_tower}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app/backend
+      - ./ml:/app/ml
+
+  simulator:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ltw_simulator
+    restart: unless-stopped
+    command: ["python", "-m", "simulator.engine"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-logistics}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-logistics_control_tower}
+      DATABASE_URL_SYNC: postgresql+psycopg2://${POSTGRES_USER:-logistics}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-logistics_control_tower}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      backend:
+        condition: service_started
+    volumes:
+      - ./simulator:/app/simulator
+      - ./backend:/app/backend
+
+volumes:
+  postgres_data:
