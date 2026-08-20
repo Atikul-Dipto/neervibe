@@ -49,6 +49,12 @@ BRANCH_PREFIX_LEN: dict[PackageStatus, int] = {
 
 
 def build_path(current_status: PackageStatus) -> list[PackageStatus]:
+    # Package.current_status is stored as a plain VARCHAR column, so a value
+    # freshly loaded from the DB (as opposed to one just constructed in this
+    # process) comes back as a str, not a PackageStatus. Normalize once here
+    # so every returned path element is guaranteed to be a real enum member.
+    current_status = PackageStatus(current_status)
+
     if current_status in HAPPY_PATH:
         idx = HAPPY_PATH.index(current_status)
         return HAPPY_PATH[: idx + 1]
