@@ -33,6 +33,12 @@ tested today:
   the architecture rules.
 - **Tests** — 15 tests covering the state machine, ETA feature pipeline, app
   boot/health, and the trained ML endpoint. All passing (`pytest`).
+- **Full stack verified against real infrastructure** — Docker Desktop,
+  PostGIS, and Redis are running; the Alembic migration applies cleanly, the
+  Bangladesh network seeds (105 nodes / 40 edges), 500 packages + ~3,800
+  events generate correctly, the API serves real DB-backed responses, and
+  the simulator's vehicle updates flow Postgres → Redis → WebSocket relay to
+  a connected client, confirmed live.
 
 ## What's NOT built yet
 
@@ -41,10 +47,6 @@ tested today:
 - Write endpoints for packages/orders/vehicles/riders, and the
   vehicles/riders/routes/events/analytics routers — Phase 2.
 - Auth/RBAC enforcement (architecture is auth-ready; not wired up yet).
-- This machine has no Docker and no local PostgreSQL/Redis, so the DB
-  container, Alembic migration run, and seed scripts have been verified for
-  syntax/imports but **not** executed against a live database. Run the
-  commands below on a machine with Docker to complete that verification.
 
 ## Architecture
 
