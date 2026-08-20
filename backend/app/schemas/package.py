@@ -32,6 +32,14 @@ class PackageCreate(PackageBase):
     pass
 
 
+class PackageStatusUpdate(BaseModel):
+    new_status: PackageStatus
+    node_id: uuid.UUID | None = None
+    rider_id: uuid.UUID | None = None
+    vehicle_id: uuid.UUID | None = None
+    metadata: dict | None = None
+
+
 class PackageRead(PackageBase):
     model_config = ConfigDict(from_attributes=True)
 

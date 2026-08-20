@@ -1,13 +1,14 @@
-"""Read endpoints for logistics network nodes."""
+"""Read and write endpoints for logistics network nodes."""
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.node import LogisticsNode
-from app.schemas.node import NodeRead
+from app.schemas.node import NodeCreate, NodeRead
+from app.services import node_service
 
 router = APIRouter(prefix="/nodes", tags=["nodes"])
 
@@ -33,3 +34,8 @@ async def get_node(node_id: uuid.UUID, db: AsyncSession = Depends(get_db)) -> Lo
     if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
     return node
+
+
+@router.post("", response_model=NodeRead, status_code=status.HTTP_201_CREATED)
+async def create_node(data: NodeCreate, db: AsyncSession = Depends(get_db)) -> LogisticsNode:
+    return await node_service.create_node(db, data)

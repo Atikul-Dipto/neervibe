@@ -16,10 +16,15 @@ tested today:
 - **Package lifecycle state machine** — the single source of truth for legal
   status transitions, in
   [backend/app/state_machine/package_state_machine.py](backend/app/state_machine/package_state_machine.py).
-- **FastAPI gateway** — health/readiness, nodes, packages, tracking, and ML
-  ETA prediction endpoints, all backed by real DB queries (no mocked
-  responses). WebSocket endpoints (`/ws/live/*`) relay whatever the
-  simulator publishes to Redis.
+- **FastAPI gateway** — full CRUD-where-it-matters across
+  nodes/packages/orders/vehicles/riders, plus read-only routes/events/
+  tracking and the ML ETA endpoint. All backed by real DB queries (no mocked
+  responses). A `services/` layer (`app/services/`) owns the business logic
+  — package status changes go through `package_service.transition_status`,
+  which enforces the state machine and writes the matching immutable event;
+  endpoints never touch the state machine or write events directly.
+  WebSocket endpoints (`/ws/live/*`) relay whatever the simulator publishes
+  to Redis.
 - **Bangladesh network seed script** — builds a realistic hub-and-spoke
   graph across 10 cities (Dhaka, Gazipur, Narayanganj, Chattogram, Cumilla,
   Sylhet, Rajshahi, Khulna, Rangpur, Mymensingh).
@@ -31,8 +36,11 @@ tested today:
 - **ETA prediction model** — a trained TensorFlow/Keras regressor served via
   `POST /api/v1/ml/eta/predict`, decoupled from the operational database per
   the architecture rules.
-- **Tests** — 15 tests covering the state machine, ETA feature pipeline, app
-  boot/health, and the trained ML endpoint. All passing (`pytest`).
+- **Tests** — 18 tests covering the state machine, ETA feature pipeline, app
+  boot/health, the trained ML endpoint, and (against the live database) the
+  full order → package → status-transition lifecycle including the 409
+  rejection of an illegal transition, vehicle/rider write endpoints, and
+  routes listing. All passing (`pytest`).
 - **Full stack verified against real infrastructure** — Docker Desktop,
   PostGIS, and Redis are running; the Alembic migration applies cleanly, the
   Bangladesh network seeds (105 nodes / 40 edges), 500 packages + ~3,800
@@ -44,8 +52,7 @@ tested today:
 
 - **Frontend** (React/Next.js control tower UI, interactive map, dashboards)
   — Phase 4/5.
-- Write endpoints for packages/orders/vehicles/riders, and the
-  vehicles/riders/routes/events/analytics routers — Phase 2.
+- `/api/v1/analytics` (network/operational KPIs) — not started.
 - Auth/RBAC enforcement (architecture is auth-ready; not wired up yet).
 
 ## Architecture
@@ -224,10 +231,13 @@ inference/` pattern and get their own endpoint under `/api/v1/ml/`.
 ## Development phases
 
 1. **Foundation** (done) — structure, models, migrations, seed data.
-2. **Logistics engine** (partial) — packages/nodes/routes read APIs exist;
-   write endpoints and vehicles/riders CRUD are next.
-3. **Real-time engine** (partial) — simulator and Redis relay exist; not yet
-   run against live infrastructure in this environment.
+2. **Logistics engine** (done) — packages, orders, nodes, vehicles, riders
+   (write endpoints via a `services/` layer), routes and events (read-only),
+   package state machine enforced through `package_service`. `/api/v1/analytics`
+   is the one piece not yet built.
+3. **Real-time engine** (done) — simulator and Redis relay verified against
+   live infrastructure: vehicle movement, package advancement, and
+   congestion updates all flow through to a connected WebSocket client.
 4. **GIS interface** — not started (needs `frontend/`).
 5. **Control tower dashboard** — not started.
 6. **TensorFlow ETA model** (done for the prototype) — trained, served, tested.
