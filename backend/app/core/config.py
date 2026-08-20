@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "Logistics Control Tower"
+    app_name: str = "NeerVibe — Logistics Control Tower"
     app_env: str = "development"
     debug: bool = True
     api_v1_prefix: str = "/api/v1"

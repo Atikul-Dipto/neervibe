@@ -1,8 +1,8 @@
-# Logistics Control Tower
+# NeerVibe
 
-A real-time logistics management and network visualization platform, built
-on synthetic Bangladesh logistics data with a production-ready architecture
-so real data can be connected later.
+A real-time logistics management and network visualization platform (the
+"Logistics Control Tower"), built on synthetic Bangladesh logistics data
+with a production-ready architecture so real data can be connected later.
 
 ## What's implemented right now
 

@@ -121,7 +121,7 @@ export function MapView() {
           "circle-radius": ["get", "radius"],
           "circle-color": ["get", "color"],
           "circle-stroke-width": 1,
-          "circle-stroke-color": "#0f172a",
+          "circle-stroke-color": "#0a2224",
         },
       });
 
@@ -132,9 +132,9 @@ export function MapView() {
         source: "vehicles",
         paint: {
           "circle-radius": 4,
-          "circle-color": "#22d3ee",
+          "circle-color": "#2dd4bf",
           "circle-stroke-width": 1.5,
-          "circle-stroke-color": "#083344",
+          "circle-stroke-color": "#042f2e",
         },
       });
 

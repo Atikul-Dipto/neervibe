@@ -1,4 +1,4 @@
-"""FastAPI application entrypoint — Logistics Control Tower API Gateway."""
+"""FastAPI application entrypoint — NeerVibe API Gateway."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

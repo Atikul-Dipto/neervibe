@@ -61,7 +61,7 @@ export function RightPanel() {
 
 function PanelShell({ children }: { children: React.ReactNode }) {
   return (
-    <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-slate-800 bg-slate-950/60 p-4">
+    <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-nv-800 bg-nv-950/60 p-4">
       {children}
     </aside>
   );
@@ -69,7 +69,7 @@ function PanelShell({ children }: { children: React.ReactNode }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2.5">
+    <div className="rounded-lg border border-nv-800 bg-nv-900/60 p-2.5">
       <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
       <div className="text-base font-semibold text-slate-100">{value}</div>
     </div>
@@ -116,7 +116,7 @@ function PackageTrackingView({ trackingNumber }: { trackingNumber: string }) {
       <div>
         <div className="text-xs uppercase tracking-wider text-slate-500">Package</div>
         <h2 className="font-mono text-base font-semibold text-slate-100">{data.tracking_number}</h2>
-        <div className="mt-1 inline-block rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-xs text-sky-300">
+        <div className="mt-1 inline-block rounded-full border border-teal-500/40 bg-teal-500/10 px-2 py-0.5 text-xs text-teal-300">
           {data.current_status.replaceAll("_", " ")}
         </div>
       </div>
@@ -125,11 +125,11 @@ function PackageTrackingView({ trackingNumber }: { trackingNumber: string }) {
         {data.timeline.map((step, i) => (
           <div key={i} className="relative flex gap-3 pb-4 last:pb-0">
             {i < data.timeline.length - 1 && (
-              <span className="absolute left-[5px] top-3 h-full w-px bg-slate-700" />
+              <span className="absolute left-[5px] top-3 h-full w-px bg-nv-700" />
             )}
             <span
               className={`z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
-                i === data.timeline.length - 1 ? "bg-sky-400" : "bg-slate-600"
+                i === data.timeline.length - 1 ? "bg-teal-400" : "bg-slate-600"
               }`}
             />
             <div>

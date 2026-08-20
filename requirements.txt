@@ -1,5 +1,5 @@
 # ==========================================================
-# Logistics Control Tower — Backend & ML Dependencies
+# NeerVibe — Backend & ML Dependencies
 # Python 3.11+
 # ==========================================================
 

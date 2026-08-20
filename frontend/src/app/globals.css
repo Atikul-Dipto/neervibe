@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
+/* NeerVibe brand scale — a deep teal-black, water-inspired chrome (panels,
+   borders, page background) instead of generic neutral slate. Paired with
+   Tailwind's built-in `teal` scale for interactive/live accents. */
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-nv-950: #04181a;
+  --color-nv-900: #0a2224;
+  --color-nv-850: #0d2b2e;
+  --color-nv-800: #123338;
+  --color-nv-700: #1c454b;
+  --color-nv-600: #2a5e64;
 }
 
 html,

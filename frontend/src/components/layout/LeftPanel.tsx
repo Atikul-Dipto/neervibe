@@ -24,7 +24,7 @@ export function LeftPanel() {
   const setFilter = useControlTowerStore((s) => s.setFilter);
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-slate-800 bg-slate-950/60 p-4 text-sm">
+    <aside className="flex w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-nv-800 bg-nv-950/60 p-4 text-sm">
       <div>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">City</h3>
         <div className="flex flex-wrap gap-1.5">
@@ -74,8 +74,8 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
       onClick={onClick}
       className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
         active
-          ? "border-sky-500 bg-sky-500/10 text-sky-300"
-          : "border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200"
+          ? "border-teal-500 bg-teal-500/10 text-teal-300"
+          : "border-nv-700 text-slate-400 hover:border-nv-600 hover:text-slate-200"
       }`}
     >
       {label}
@@ -98,7 +98,7 @@ function LegendRow({
     <button
       onClick={onClick}
       className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
-        active ? "bg-slate-800 text-slate-100" : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+        active ? "bg-nv-800 text-slate-100" : "text-slate-400 hover:bg-nv-900 hover:text-slate-200"
       }`}
     >
       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
