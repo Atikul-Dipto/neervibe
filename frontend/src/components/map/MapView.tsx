@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Map as MapLibreMap,
   NavigationControl,
@@ -70,6 +70,8 @@ function routesToGeoJSON(routes: LogisticsRoute[], nodesById: Map<string, Logist
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 
+type LoadState = { status: "loading" | "ready" | "error"; message?: string };
+
 export function MapView() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -78,6 +80,7 @@ export function MapView() {
   const upsertVehicle = useControlTowerStore((s) => s.upsertVehicle);
   const pushEvent = useControlTowerStore((s) => s.pushEvent);
   const filters = useControlTowerStore((s) => s.filters);
+  const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
 
   // Map init + static layers (nodes, edges) — runs once.
   useEffect(() => {
@@ -95,11 +98,24 @@ export function MapView() {
     map.addControl(new AttributionControl({ compact: true }));
 
     map.on("error", (e) => {
+      const message = e.error?.message ?? "Unknown map error";
       // eslint-disable-next-line no-console
-      console.error("[maplibre error]", e.error?.message ?? e);
+      console.error("[maplibre error]", message);
+      setLoadState({ status: "error", message: `Map style/tile error: ${message}` });
     });
 
+    // If "load" never fires (e.g. the base map's tiles are stuck/blocked),
+    // surface that instead of leaving the panel silently dark forever.
+    const stallTimer = setTimeout(() => {
+      setLoadState((prev) =>
+        prev.status === "loading"
+          ? { status: "error", message: "Map is taking unusually long to load — the base map tiles may be blocked (ad blocker / network) or slow to respond." }
+          : prev,
+      );
+    }, 10000);
+
     map.on("load", async () => {
+      clearTimeout(stallTimer);
       map.addSource("routes", { type: "geojson", data: EMPTY_FC });
       map.addLayer({
         id: "routes-line",
@@ -151,15 +167,35 @@ export function MapView() {
         map.getCanvas().style.cursor = "";
       });
 
-      const [nodes, routes] = await Promise.all([api.listNodes(), api.listRoutes({})]);
-      const nodesById = new Map(nodes.map((n) => [n.id, n]));
-      nodesByIdRef.current = nodesById;
+      try {
+        const [nodes, routes] = await Promise.all([api.listNodes(), api.listRoutes({})]);
+        const nodesById = new Map(nodes.map((n) => [n.id, n]));
+        nodesByIdRef.current = nodesById;
 
-      (map.getSource("nodes") as GeoJSONSource).setData(nodesToGeoJSON(nodes));
-      (map.getSource("routes") as GeoJSONSource).setData(routesToGeoJSON(routes, nodesById));
+        (map.getSource("nodes") as GeoJSONSource).setData(nodesToGeoJSON(nodes));
+        (map.getSource("routes") as GeoJSONSource).setData(routesToGeoJSON(routes, nodesById));
+
+        if (nodes.length === 0) {
+          setLoadState({
+            status: "error",
+            message: "Map loaded but the network has no nodes — run scripts/seed_database.py against the backend.",
+          });
+        } else {
+          setLoadState({ status: "ready" });
+        }
+      } catch (err) {
+        // Without this catch, a failed fetch here becomes an unhandled
+        // promise rejection MapLibre never surfaces — the map silently
+        // stays empty forever with no visible signal of why.
+        const message = err instanceof Error ? err.message : String(err);
+        // eslint-disable-next-line no-console
+        console.error("[MapView] failed to load network data", err);
+        setLoadState({ status: "error", message: `Failed to load network data from the API: ${message}` });
+      }
     });
 
     return () => {
+      clearTimeout(stallTimer);
       map.remove();
       mapRef.current = null;
     };
@@ -201,5 +237,25 @@ export function MapView() {
   // Live package status changes feed the bottom event stream.
   useLiveChannel<PackageLiveUpdate>("packages", (update) => pushEvent(update));
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+
+      {loadState.status === "loading" && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="rounded-md border border-nv-700 bg-nv-900/90 px-4 py-2 text-sm text-slate-300">
+            Loading network map…
+          </div>
+        </div>
+      )}
+
+      {loadState.status === "error" && (
+        <div className="pointer-events-none absolute inset-x-0 top-4 flex justify-center px-4">
+          <div className="max-w-xl rounded-md border border-rose-500/40 bg-rose-950/90 px-4 py-2 text-sm text-rose-200">
+            {loadState.message}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
