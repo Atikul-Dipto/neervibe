@@ -47,13 +47,27 @@ tested today:
   events generate correctly, the API serves real DB-backed responses, and
   the simulator's vehicle updates flow Postgres → Redis → WebSocket relay to
   a connected client, confirmed live.
+- **Frontend control tower** (`frontend/`) — Next.js 16 + TypeScript +
+  MapLibre GL. Dark control-center layout (top nav, filter panel, map,
+  contextual right panel, live event stream) per the design spec. The map
+  renders the seeded network (nodes color-/size-coded by type, edges
+  colored by congestion), animates live vehicle positions over
+  `/ws/live/vehicles`, feeds the event stream from `/ws/live/packages`,
+  and supports click-a-node-for-detail and tracking-number search with a
+  timeline view. Type-checks and production-builds clean
+  (`npx tsc --noEmit`, `npm run build`). **Not yet confirmed rendering
+  correctly in an actual browser** — this sandbox's headless Chromium has
+  no GPU passthrough and MapLibre's WebGL2 render loop never completes
+  here (confirmed environment-specific: MapLibre's own official demo style
+  exhibits the same stall, independent of our code). The dev server is
+  running now — open `http://localhost:3000` in a real browser to verify.
 
 ## What's NOT built yet
 
-- **Frontend** (React/Next.js control tower UI, interactive map, dashboards)
-  — Phase 4/5.
-- `/api/v1/analytics` (network/operational KPIs) — not started.
+- Control tower dashboard KPI panels (`/api/v1/analytics` and the
+  Operations/Analytics nav tabs are placeholders) — rest of Phase 5.
 - Auth/RBAC enforcement (architecture is auth-ready; not wired up yet).
+- Frontend automated tests (no Jest/Playwright suite yet).
 
 ## Architecture
 
@@ -96,6 +110,14 @@ logistics-control-tower/
 ├── ml/             TensorFlow/Keras ETA model — data, preprocessing,
 │                   models, training, inference, evaluation, pipelines
 ├── simulator/       Real-time event simulation engine
+├── frontend/        Next.js control tower UI
+│   └── src/
+│       ├── app/            routes (App Router)
+│       ├── components/     map/, layout/, packages/
+│       ├── hooks/          useLiveChannel (WebSocket)
+│       ├── services/       REST API client
+│       ├── store/          zustand global state
+│       └── types/          domain types mirroring backend schemas
 ├── scripts/         Seed/data-generation scripts
 ├── tests/           unit / integration / simulation
 ├── docker-compose.yml
@@ -189,7 +211,21 @@ uvicorn app.main:app --reload
 
 Visit `http://localhost:8000/docs` for interactive API docs.
 
-### 9. Run tests
+### 9. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Visit `http://localhost:3000`. It talks to the backend at
+`http://localhost:8000` by default — override with `NEXT_PUBLIC_API_BASE_URL`
+/ `NEXT_PUBLIC_WS_BASE_URL` env vars if your backend runs elsewhere. The
+backend's default CORS origin (`http://localhost:3000`) already matches
+Next's dev port.
+
+### 10. Run tests
 
 ```bash
 pytest
@@ -238,8 +274,13 @@ inference/` pattern and get their own endpoint under `/api/v1/ml/`.
 3. **Real-time engine** (done) — simulator and Redis relay verified against
    live infrastructure: vehicle movement, package advancement, and
    congestion updates all flow through to a connected WebSocket client.
-4. **GIS interface** — not started (needs `frontend/`).
-5. **Control tower dashboard** — not started.
+4. **GIS interface** (done for the core interactions) — Next.js +
+   MapLibre control tower with live vehicle tracking, node click-through,
+   and package tracking search; not yet confirmed rendering in a real
+   browser in this sandbox (see note above).
+5. **Control tower dashboard** (partial) — the layout shell (nav, filters,
+   contextual panel, live event stream) is built; KPI/analytics panels are
+   not.
 6. **TensorFlow ETA model** (done for the prototype) — trained, served, tested.
 7. **Intelligence** (congestion/delay/risk/demand models) — not started.
 8. **Production hardening** (auth, RBAC, monitoring) — not started.
