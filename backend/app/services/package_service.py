@@ -5,12 +5,12 @@ call into this module, they don't touch the state machine or write
 PackageEvent rows themselves.
 """
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import LogEvent, get_logger
-from app.models.enums import EventType, PackageStatus
+from app.models.enums import DeliveryType, EventType, PackageStatus
 from app.models.event import PackageEvent
 from app.models.package import Package
 from app.schemas.package import PackageCreate
@@ -18,8 +18,19 @@ from app.state_machine.package_state_machine import assert_valid_transition
 
 logger = get_logger(__name__)
 
+# Matches scripts/generate_dummy_packages.py's SLA_HOURS so a package's
+# expected_delivery_at is computed the same way regardless of whether it
+# was seeded or created live through the API.
+SLA_HOURS: dict[DeliveryType, int] = {
+    DeliveryType.STANDARD: 72,
+    DeliveryType.EXPRESS: 24,
+    DeliveryType.SAME_DAY: 8,
+    DeliveryType.SCHEDULED: 48,
+}
+
 
 async def create_package(db: AsyncSession, data: PackageCreate) -> Package:
+    now = datetime.now(timezone.utc)
     package = Package(
         tracking_number=f"PKG-{uuid.uuid4().hex[:12].upper()}",
         order_id=data.order_id,
@@ -35,11 +46,11 @@ async def create_package(db: AsyncSession, data: PackageCreate) -> Package:
         current_status=PackageStatus.PACKAGE_CREATED,
         source_node_id=data.source_node_id,
         destination_node_id=data.destination_node_id,
+        expected_delivery_at=now + timedelta(hours=SLA_HOURS[data.delivery_type]),
     )
     db.add(package)
     await db.flush()
 
-    now = datetime.now(timezone.utc)
     db.add(
         PackageEvent(
             package_id=package.id,

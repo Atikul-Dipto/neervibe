@@ -8,11 +8,44 @@ import type { PackageTracking } from "@/types/domain";
 export function RightPanel() {
   const selectedNode = useControlTowerStore((s) => s.selectedNode);
   const selectedTrackingNumber = useControlTowerStore((s) => s.selectedTrackingNumber);
+  const selectedVehicle = useControlTowerStore((s) => s.selectedVehicle);
+  const liveVehicles = useControlTowerStore((s) => s.vehicles);
 
   if (selectedTrackingNumber) {
     return (
       <PanelShell>
         <PackageTrackingView trackingNumber={selectedTrackingNumber} />
+      </PanelShell>
+    );
+  }
+
+  if (selectedVehicle) {
+    const live = liveVehicles.get(selectedVehicle.id);
+    const status = live?.status ?? selectedVehicle.status;
+    const speed = live?.speed ?? selectedVehicle.speed;
+    const lat = live?.latitude ?? selectedVehicle.current_latitude;
+    const lon = live?.longitude ?? selectedVehicle.current_longitude;
+    return (
+      <PanelShell>
+        <div className="space-y-4">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-slate-500">
+              {selectedVehicle.vehicle_type.replaceAll("_", " ")}
+            </div>
+            <h2 className="font-mono text-lg font-semibold text-slate-100">
+              {selectedVehicle.registration_number}
+            </h2>
+          </div>
+
+          <StatusBadge status={status} />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Stat label="Speed" value={`${speed.toFixed(1)} km/h`} />
+            <Stat label="Heading" value={`${Math.round(live?.heading ?? selectedVehicle.heading)}°`} />
+            <Stat label="Capacity" value={`${selectedVehicle.capacity.toFixed(0)} kg`} />
+            <Stat label="Position" value={lat != null && lon != null ? `${lat.toFixed(3)}, ${lon.toFixed(3)}` : "—"} />
+          </div>
+        </div>
       </PanelShell>
     );
   }
@@ -53,7 +86,7 @@ export function RightPanel() {
   return (
     <PanelShell>
       <div className="flex h-full items-center justify-center text-center text-sm text-slate-500">
-        Click a node on the map, or search a tracking number above, to inspect it here.
+        Click a node or vehicle, or search a tracking number above, to inspect it here.
       </div>
     </PanelShell>
   );
@@ -76,13 +109,15 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
+const GOOD_STATUSES = new Set(["OPERATIONAL", "EN_ROUTE", "IDLE", "AVAILABLE"]);
+const WARN_STATUSES = new Set(["CONGESTED", "DEGRADED", "LOADING", "UNLOADING"]);
+
 function StatusBadge({ status }: { status: string }) {
-  const color =
-    status === "OPERATIONAL"
-      ? "bg-emerald-400"
-      : status === "CONGESTED" || status === "DEGRADED"
-        ? "bg-amber-400"
-        : "bg-rose-400";
+  const color = GOOD_STATUSES.has(status)
+    ? "bg-emerald-400"
+    : WARN_STATUSES.has(status)
+      ? "bg-amber-400"
+      : "bg-rose-400";
   return (
     <div className="flex items-center gap-1.5 text-xs text-slate-300">
       <span className={`h-1.5 w-1.5 rounded-full ${color}`} />

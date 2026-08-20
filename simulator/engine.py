@@ -119,7 +119,8 @@ class SimulationEngine:
                 vehicle.status = VehicleStatus.EN_ROUTE
 
             edge = runtime.current_edge
-            travel_ticks = max(1, round(edge.current_travel_time * 60 / settings.simulation_tick_seconds))
+            travel_seconds = edge.current_travel_time * 60 / settings.simulation_time_acceleration
+            travel_ticks = max(1, round(travel_seconds / settings.simulation_tick_seconds))
             runtime.progress += 1.0 / travel_ticks
 
             source = self.nodes[edge.source_node_id]

@@ -1,13 +1,14 @@
 """Aggregates all v1 endpoint routers.
 
-Phase 2 adds write endpoints for packages/orders/nodes/vehicles/riders, plus
-read-only routes/events routers, all backed by a services/ layer that owns
-the business logic (state machine transitions, event writes) so endpoints
-stay thin. Analytics is not implemented yet.
+Every resource group in the spec's API architecture is now covered:
+packages/orders/nodes/vehicles/riders (full read/write via a services/
+layer), routes/events (read-only), tracking, ml, and analytics (read-only
+aggregates for the Operations/Analytics frontend pages).
 """
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    analytics,
     events,
     health,
     ml,
@@ -31,3 +32,4 @@ api_router.include_router(routes.router)
 api_router.include_router(events.router)
 api_router.include_router(tracking.router)
 api_router.include_router(ml.router)
+api_router.include_router(analytics.router)

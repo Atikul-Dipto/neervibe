@@ -10,15 +10,9 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { api } from "@/services/api";
-import { useLiveChannel } from "@/hooks/useLiveChannel";
 import { useControlTowerStore } from "@/store/useControlTowerStore";
 import { NODE_TYPE_COLORS, NODE_TYPE_RADIUS, congestionColor } from "./nodeStyle";
-import type {
-  LogisticsNode,
-  LogisticsRoute,
-  PackageLiveUpdate,
-  VehicleLiveUpdate,
-} from "@/types/domain";
+import type { LogisticsNode, LogisticsRoute } from "@/types/domain";
 
 const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 const BANGLADESH_CENTER: [number, number] = [90.35, 23.9];
@@ -77,8 +71,6 @@ export function MapView() {
   const mapRef = useRef<MapLibreMap | null>(null);
   const nodesByIdRef = useRef<Map<string, LogisticsNode>>(new Map());
   const selectNode = useControlTowerStore((s) => s.selectNode);
-  const upsertVehicle = useControlTowerStore((s) => s.upsertVehicle);
-  const pushEvent = useControlTowerStore((s) => s.pushEvent);
   const filters = useControlTowerStore((s) => s.filters);
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
 
@@ -154,6 +146,19 @@ export function MapView() {
         },
       });
 
+      // Populate immediately from whatever LiveDataProvider has already
+      // collected — don't wait for the next WebSocket tick to show vehicles
+      // that were already in flight before this map instance mounted.
+      const initialVehicles = useControlTowerStore.getState().vehicles;
+      (map.getSource("vehicles") as GeoJSONSource).setData({
+        type: "FeatureCollection",
+        features: Array.from(initialVehicles.values()).map((v) => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [v.longitude, v.latitude] },
+          properties: { id: v.vehicle_id, registration_number: v.registration_number, status: v.status },
+        })),
+      });
+
       map.on("click", "nodes-circle", (e: MapLayerMouseEvent) => {
         const feature = e.features?.[0];
         if (!feature) return;
@@ -215,27 +220,24 @@ export function MapView() {
     (map.getSource("nodes") as GeoJSONSource)?.setData(nodesToGeoJSON(filtered));
   }, [filters]);
 
-  // Live vehicle positions.
-  const vehiclesRef = useRef<Map<string, VehicleLiveUpdate>>(new Map());
-  useLiveChannel<VehicleLiveUpdate>("vehicles", (update) => {
-    vehiclesRef.current.set(update.vehicle_id, update);
-    upsertVehicle(update);
+  // Live vehicle positions come from the store — LiveDataProvider owns the
+  // actual WebSocket subscription (it stays mounted app-wide, unlike this
+  // component, so the feed doesn't drop when the user switches pages).
+  const vehicles = useControlTowerStore((s) => s.vehicles);
+  useEffect(() => {
     const map = mapRef.current;
     const source = map?.getSource("vehicles") as GeoJSONSource | undefined;
     if (!source) return;
     const fc: GeoJSON.FeatureCollection = {
       type: "FeatureCollection",
-      features: Array.from(vehiclesRef.current.values()).map((v) => ({
+      features: Array.from(vehicles.values()).map((v) => ({
         type: "Feature",
         geometry: { type: "Point", coordinates: [v.longitude, v.latitude] },
         properties: { id: v.vehicle_id, registration_number: v.registration_number, status: v.status },
       })),
     };
     source.setData(fc);
-  });
-
-  // Live package status changes feed the bottom event stream.
-  useLiveChannel<PackageLiveUpdate>("packages", (update) => pushEvent(update));
+  }, [vehicles]);
 
   return (
     <div className="relative h-full w-full">

@@ -48,24 +48,36 @@ tested today:
   the simulator's vehicle updates flow Postgres → Redis → WebSocket relay to
   a connected client, confirmed live.
 - **Frontend control tower** (`frontend/`) — Next.js 16 + TypeScript +
-  MapLibre GL. Dark control-center layout (top nav, filter panel, map,
-  contextual right panel, live event stream) per the design spec. The map
-  renders the seeded network (nodes color-/size-coded by type, edges
-  colored by congestion), animates live vehicle positions over
-  `/ws/live/vehicles`, feeds the event stream from `/ws/live/packages`,
-  and supports click-a-node-for-detail and tracking-number search with a
-  timeline view. Type-checks and production-builds clean
-  (`npx tsc --noEmit`, `npm run build`). **Not yet confirmed rendering
-  correctly in an actual browser** — this sandbox's headless Chromium has
-  no GPU passthrough and MapLibre's WebGL2 render loop never completes
-  here (confirmed environment-specific: MapLibre's own official demo style
-  exhibits the same stall, independent of our code). The dev server is
-  running now — open `http://localhost:3000` in a real browser to verify.
+  MapLibre GL, all seven nav pages built and wired to real data:
+  - **Network** — the live map: seeded nodes/edges, animated vehicle
+    positions over `/ws/live/vehicles`, click-a-node-for-detail,
+    tracking-number search with a timeline view.
+  - **Operations** — timing and delivery-performance KPIs (avg delivery/
+    pickup time, on-time rate, SLA breach rate, return/cancellation rate).
+  - **Packages** / **Vehicles** / **Hubs** — filterable, sortable tables
+    over the real REST endpoints; clicking a row opens that item's detail
+    in the right panel.
+  - **Analytics** — network overview + network metrics + a highest-volume
+    hubs table.
+  - **AI Intelligence** — a live form driving `POST /api/v1/ml/eta/predict`
+    against the trained model.
+
+  A `LiveDataProvider` (always mounted at the page root) owns the
+  vehicles/packages WebSocket subscriptions and writes into a shared
+  zustand store, so the bottom live event stream keeps updating no matter
+  which page is showing — it doesn't depend on the map being mounted.
+  Verified end-to-end with real screenshots across every page: zero
+  console errors, live vehicle movement, and the event stream populating
+  from genuine simulator-driven package transitions.
+- **Analytics backend** (`GET /api/v1/analytics/overview`) — real SQL
+  aggregates (not mocked) computing network overview, operational metrics,
+  and network metrics including a live per-node package count (the
+  `current_load` column existed but was never actually maintained anywhere
+  in the app, so it was fixed to compute from real package positions
+  instead of always reading 0).
 
 ## What's NOT built yet
 
-- Control tower dashboard KPI panels (`/api/v1/analytics` and the
-  Operations/Analytics nav tabs are placeholders) — rest of Phase 5.
 - Auth/RBAC enforcement (architecture is auth-ready; not wired up yet).
 - Frontend automated tests (no Jest/Playwright suite yet).
 
@@ -269,18 +281,19 @@ inference/` pattern and get their own endpoint under `/api/v1/ml/`.
 1. **Foundation** (done) — structure, models, migrations, seed data.
 2. **Logistics engine** (done) — packages, orders, nodes, vehicles, riders
    (write endpoints via a `services/` layer), routes and events (read-only),
-   package state machine enforced through `package_service`. `/api/v1/analytics`
-   is the one piece not yet built.
+   package state machine enforced through `package_service`, plus
+   `/api/v1/analytics/overview`.
 3. **Real-time engine** (done) — simulator and Redis relay verified against
    live infrastructure: vehicle movement, package advancement, and
-   congestion updates all flow through to a connected WebSocket client.
-4. **GIS interface** (done for the core interactions) — Next.js +
-   MapLibre control tower with live vehicle tracking, node click-through,
-   and package tracking search; not yet confirmed rendering in a real
-   browser in this sandbox (see note above).
-5. **Control tower dashboard** (partial) — the layout shell (nav, filters,
-   contextual panel, live event stream) is built; KPI/analytics panels are
-   not.
+   congestion updates all flow through to a connected WebSocket client. Edge
+   travel times are accelerated (`SIMULATION_TIME_ACCELERATION`, default
+   30x) so a "real-time" demo doesn't mean waiting real hours for a highway
+   leg to complete.
+4. **GIS interface** (done) — Next.js + MapLibre control tower with live
+   vehicle tracking, node click-through, and package tracking search.
+   Confirmed rendering correctly with real screenshots (see note above).
+5. **Control tower dashboard** (done) — all seven pages built: Network
+   (map), Operations, Packages, Vehicles, Hubs, Analytics, AI Intelligence.
 6. **TensorFlow ETA model** (done for the prototype) — trained, served, tested.
 7. **Intelligence** (congestion/delay/risk/demand models) — not started.
 8. **Production hardening** (auth, RBAC, monitoring) — not started.

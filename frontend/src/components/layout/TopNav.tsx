@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
 import { TrackingSearch } from "@/components/packages/TrackingSearch";
+import { useControlTowerStore, type ActiveView } from "@/store/useControlTowerStore";
 
-const NAV_ITEMS = ["Network", "Operations", "Packages", "Vehicles", "Hubs", "Analytics", "AI Intelligence"];
+const NAV_ITEMS: { label: string; view: ActiveView }[] = [
+  { label: "Network", view: "network" },
+  { label: "Operations", view: "operations" },
+  { label: "Packages", view: "packages" },
+  { label: "Vehicles", view: "vehicles" },
+  { label: "Hubs", view: "hubs" },
+  { label: "Analytics", view: "analytics" },
+  { label: "AI Intelligence", view: "ai" },
+];
 
 export function TopNav() {
-  const [active, setActive] = useState("Network");
+  const activeView = useControlTowerStore((s) => s.activeView);
+  const setActiveView = useControlTowerStore((s) => s.setActiveView);
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-6 border-b border-nv-800 bg-nv-950/80 px-4 backdrop-blur">
@@ -20,15 +29,15 @@ export function TopNav() {
       <nav className="flex items-center gap-1 text-sm">
         {NAV_ITEMS.map((item) => (
           <button
-            key={item}
-            onClick={() => setActive(item)}
+            key={item.view}
+            onClick={() => setActiveView(item.view)}
             className={`rounded-md px-3 py-1.5 transition-colors ${
-              active === item
+              activeView === item.view
                 ? "bg-nv-800 text-slate-50"
                 : "text-slate-400 hover:bg-nv-900 hover:text-slate-200"
             }`}
           >
-            {item}
+            {item.label}
           </button>
         ))}
       </nav>

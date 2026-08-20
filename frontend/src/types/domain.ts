@@ -34,8 +34,11 @@ export type PackageStatus =
   | "DAMAGED";
 
 export type VehicleStatus = "IDLE" | "EN_ROUTE" | "LOADING" | "UNLOADING" | "MAINTENANCE" | "OFFLINE";
+export type VehicleType = "BICYCLE" | "MOTORCYCLE" | "VAN" | "TRUCK" | "MINI_TRUCK";
+export type RiderStatus = "AVAILABLE" | "ON_DELIVERY" | "ON_PICKUP" | "OFF_DUTY";
 export type RouteStatus = "ACTIVE" | "CONGESTED" | "BLOCKED" | "SUSPENDED";
 export type RoadType = "HIGHWAY" | "ARTERIAL" | "URBAN" | "RURAL" | "FERRY";
+export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
 
 export interface LogisticsNode {
   id: string;
@@ -74,6 +77,7 @@ export interface Package {
   customer_id: string;
   merchant_id: string;
   package_weight: number;
+  priority: Priority;
   current_status: PackageStatus;
   current_node_id: string | null;
   source_node_id: string;
@@ -129,4 +133,94 @@ export interface RouteLiveUpdate {
   congestion_level: number;
   risk_score: number;
   current_travel_time: number;
+}
+
+export interface Vehicle {
+  id: string;
+  registration_number: string;
+  vehicle_type: VehicleType;
+  capacity: number;
+  current_latitude: number | null;
+  current_longitude: number | null;
+  current_node_id: string | null;
+  speed: number;
+  heading: number;
+  status: VehicleStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Rider {
+  id: string;
+  name: string;
+  phone: string;
+  status: RiderStatus;
+  current_latitude: number | null;
+  current_longitude: number | null;
+  current_node_id: string | null;
+  vehicle_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NetworkOverview {
+  total_packages: number;
+  in_transit: number;
+  delivered: number;
+  delayed: number;
+  failed_deliveries: number;
+  returns: number;
+  active_vehicles: number;
+  active_riders: number;
+  active_routes: number;
+  network_utilization_pct: number;
+}
+
+export interface OperationalMetrics {
+  avg_delivery_time_minutes: number | null;
+  avg_pickup_time_minutes: number | null;
+  hub_processing_time_minutes: number | null;
+  first_attempt_delivery_rate_pct: number | null;
+  on_time_delivery_rate_pct: number | null;
+  sla_breach_rate_pct: number | null;
+  return_rate_pct: number;
+  cancellation_rate_pct: number;
+}
+
+export interface HubVolume {
+  node_id: string;
+  node_code: string;
+  node_name: string;
+  current_load: number;
+  capacity: number;
+}
+
+export interface NetworkMetrics {
+  active_nodes: number;
+  congested_routes: number;
+  high_risk_routes: number;
+  highest_volume_hubs: HubVolume[];
+  network_throughput_24h: number;
+}
+
+export interface AnalyticsOverview {
+  network: NetworkOverview;
+  operations: OperationalMetrics;
+  network_metrics: NetworkMetrics;
+  generated_at: string;
+}
+
+export interface ETAPredictRequest {
+  distance_km: number;
+  congestion_level: number;
+  package_weight: number;
+  hour: number;
+  priority: Priority;
+  day_of_week: number;
+  vehicle_type: string;
+}
+
+export interface ETAPredictResponse {
+  predicted_eta_minutes: number;
+  confidence: number;
 }

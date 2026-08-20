@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     simulation_tick_seconds: float = 3.0
     simulation_vehicle_count: int = 40
     simulation_package_spawn_rate: int = 5
+    # Edge travel times are real-world minutes (e.g. an 85-minute highway
+    # leg). At 1x that's 85 real minutes for a vehicle to arrive — dead air
+    # for a "real-time" control tower demo. Default 30x means that leg
+    # completes in well under 3 minutes of wall-clock time instead.
+    simulation_time_acceleration: float = 30.0
 
     # ML
     ml_model_dir: str = "./ml/models/artifacts"
