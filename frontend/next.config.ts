@@ -7,6 +7,11 @@ const nextConfig: NextConfig = {
   // before connection established" WS warnings. Production builds don't
   // double-invoke regardless, so this only affects dev-mode noise.
   reactStrictMode: false,
+  // The dev server rejects requests whose Host header it doesn't recognize
+  // (DNS-rebinding protection), which 403s every asset when accessed through
+  // a tunnel. Quick-tunnel hostnames are random per run, so this needs
+  // updating whenever the tunnel is restarted — see README's tunnel note.
+  allowedDevOrigins: ["port-streets-whose-westminster.trycloudflare.com"],
 };
 
 export default nextConfig;
