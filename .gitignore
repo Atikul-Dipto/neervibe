@@ -11,8 +11,11 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 
-# ML artifacts (large binaries — regenerate via training scripts)
-ml/models/artifacts/
+# ML artifacts (large binaries — regenerate via training scripts).
+# eta_predictor_v1 is committed on purpose: it's ~86KB and the deployed
+# backend needs it available at boot without a training step.
+ml/models/artifacts/*
+!ml/models/artifacts/eta_predictor_v1/
 
 # Test / coverage
 .pytest_cache/

@@ -90,6 +90,11 @@ async def ensure_parties(session: AsyncSession, n_customers: int, n_merchants: i
 
 async def generate(count: int) -> None:
     async with AsyncSessionLocal() as session:
+        existing = await session.execute(select(func.count()).select_from(Package))
+        if existing.scalar_one() >= count:
+            print(f"Database already has >= {count} packages. Skipping.")
+            return
+
         await ensure_parties(session, n_customers=max(20, count // 10), n_merchants=max(10, count // 25))
 
         customers = (await session.execute(select(Customer))).scalars().all()
