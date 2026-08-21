@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # for a "real-time" control tower demo. Default 30x means that leg
     # completes in well under 3 minutes of wall-clock time instead.
     simulation_time_acceleration: float = 30.0
+    # Standalone (python -m simulator.engine, a separate process/service) is
+    # the default — matches docker-compose's dedicated `simulator` container.
+    # Some hosts only allow a small number of services on their free tier;
+    # setting this runs the same engine as a background asyncio task inside
+    # the API process instead, needing one fewer service.
+    run_simulator_inprocess: bool = False
 
     # ML
     ml_model_dir: str = "./ml/models/artifacts"

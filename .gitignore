@@ -32,3 +32,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Railway IaC config — contains provisioning secrets for this deployment
+# session (DB password, SECRET_KEY), not meant as team-shared infra code.
+.railway/
+# npm scaffolding for the `railway` TS SDK the above depends on
+node_modules/
+/package.json
+/package-lock.json

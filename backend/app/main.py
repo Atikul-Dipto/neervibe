@@ -1,4 +1,5 @@
 """FastAPI application entrypoint — NeerVibe API Gateway."""
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,7 +19,20 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("application_startup", env=settings.app_env)
     relay_tasks = await start_relays()
+
+    simulator_task = None
+    if settings.run_simulator_inprocess:
+        # Deferred import: simulator/ has its own dependency footprint and
+        # shouldn't load into the API process unless actually requested.
+        from simulator.engine import SimulationEngine
+
+        logger.info("simulator_starting_inprocess")
+        simulator_task = asyncio.create_task(SimulationEngine().run())
+
     yield
+
+    if simulator_task is not None:
+        simulator_task.cancel()
     for task in relay_tasks:
         task.cancel()
     logger.info("application_shutdown")
