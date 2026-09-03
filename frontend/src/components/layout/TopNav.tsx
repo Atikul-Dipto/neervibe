@@ -1,16 +1,27 @@
 "use client";
 
+import {
+  Activity,
+  BarChart3,
+  Building2,
+  Map as MapIcon,
+  Package,
+  Sparkles,
+  Truck,
+  type LucideIcon,
+} from "lucide-react";
 import { TrackingSearch } from "@/components/packages/TrackingSearch";
 import { useControlTowerStore, type ActiveView } from "@/store/useControlTowerStore";
+import clsx from "clsx";
 
-const NAV_ITEMS: { label: string; view: ActiveView }[] = [
-  { label: "Network", view: "network" },
-  { label: "Operations", view: "operations" },
-  { label: "Packages", view: "packages" },
-  { label: "Vehicles", view: "vehicles" },
-  { label: "Hubs", view: "hubs" },
-  { label: "Analytics", view: "analytics" },
-  { label: "AI Intelligence", view: "ai" },
+const NAV_ITEMS: { label: string; view: ActiveView; icon: LucideIcon }[] = [
+  { label: "Network", view: "network", icon: MapIcon },
+  { label: "Operations", view: "operations", icon: Activity },
+  { label: "Packages", view: "packages", icon: Package },
+  { label: "Vehicles", view: "vehicles", icon: Truck },
+  { label: "Hubs", view: "hubs", icon: Building2 },
+  { label: "Analytics", view: "analytics", icon: BarChart3 },
+  { label: "AI Intelligence", view: "ai", icon: Sparkles },
 ];
 
 export function TopNav() {
@@ -18,31 +29,36 @@ export function TopNav() {
   const setActiveView = useControlTowerStore((s) => s.setActiveView);
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-6 border-b border-nv-800 bg-nv-950/80 px-4 backdrop-blur">
-      <div className="flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-teal-400 shadow-[0_0_8px_2px_rgba(45,212,191,0.6)]" />
-        <span className="font-semibold tracking-wide text-slate-100">
-          NEER<span className="text-teal-400">VIBE</span>
+    <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-nv-800 bg-gradient-to-b from-nv-900/85 to-nv-950/85 px-4 backdrop-blur">
+      <div className="flex items-center gap-2 justify-self-start">
+        <span className="h-2 w-2 animate-[breathe_2.4s_ease-in-out_infinite] rounded-full bg-teal-400" />
+        <span className="font-semibold tracking-wide text-zinc-100">
+          NEER
+          <span className="bg-gradient-to-r from-teal-300 via-teal-400 to-teal-500 bg-clip-text text-transparent">
+            VIBE
+          </span>
         </span>
       </div>
 
-      <nav className="flex items-center gap-1 text-sm">
+      <nav className="flex items-center gap-1 text-sm justify-self-center">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.view}
             onClick={() => setActiveView(item.view)}
-            className={`rounded-md px-3 py-1.5 transition-colors ${
+            className={clsx(
+              "relative flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all duration-200",
               activeView === item.view
-                ? "bg-nv-800 text-slate-50"
-                : "text-slate-400 hover:bg-nv-900 hover:text-slate-200"
-            }`}
+                ? "bg-gradient-to-br from-teal-500/15 to-teal-500/5 text-zinc-50 shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)] after:absolute after:inset-x-3.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-gradient-to-r after:from-teal-400 after:to-teal-300"
+                : "text-zinc-400 hover:-translate-y-px hover:bg-teal-400/10 hover:text-zinc-200",
+            )}
           >
-            {item.label}
+            <item.icon className="h-3.5 w-3.5" aria-hidden />
+            <span className="hidden xl:inline">{item.label}</span>
           </button>
         ))}
       </nav>
 
-      <div className="ml-auto w-80">
+      <div className="w-80 justify-self-end">
         <TrackingSearch />
       </div>
     </header>

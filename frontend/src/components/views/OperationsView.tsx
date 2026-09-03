@@ -2,6 +2,8 @@
 
 import { useAnalyticsOverview } from "@/hooks/useAnalyticsOverview";
 import { StatCard, StatSection } from "./StatCard";
+import { StatCardSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState } from "@/components/ui/States";
 
 function formatMinutes(value: number | null): string {
   if (value == null) return "No data";
@@ -20,10 +22,16 @@ export function OperationsView() {
 
   return (
     <div className="p-6">
-      <h1 className="mb-6 text-lg font-semibold text-slate-100">Operations</h1>
+      <h1 className="mb-6 text-lg font-semibold text-zinc-100">Operations</h1>
 
-      {loading && <div className="text-sm text-slate-500">Loading operational metrics…</div>}
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {loading && (
+        <StatSection title="Timing">
+          {Array.from({ length: 3 }, (_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </StatSection>
+      )}
+      {error && <ErrorState message={error} />}
 
       {data && (
         <>

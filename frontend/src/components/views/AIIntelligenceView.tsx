@@ -1,8 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
 import { api, ApiError } from "@/services/api";
 import type { ETAPredictResponse, Priority } from "@/types/domain";
+import { Card } from "@/components/ui/Card";
+import { Select } from "@/components/ui/Select";
+import { Button } from "@/components/ui/Button";
+import { ErrorState } from "@/components/ui/States";
 
 const PRIORITIES: Priority[] = ["LOW", "NORMAL", "HIGH", "URGENT"];
 const VEHICLE_TYPES = ["BICYCLE", "MOTORCYCLE", "VAN", "TRUCK", "MINI_TRUCK"];
@@ -52,13 +57,13 @@ export function AIIntelligenceView() {
 
   return (
     <div className="p-6">
-      <h1 className="mb-1 text-lg font-semibold text-slate-100">AI Intelligence</h1>
-      <p className="mb-6 text-sm text-slate-500">
+      <h1 className="mb-1 text-lg font-semibold text-zinc-100">AI Intelligence</h1>
+      <p className="mb-6 text-sm text-zinc-500">
         TensorFlow/Keras ETA prediction — POST /api/v1/ml/eta/predict
       </p>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <form onSubmit={submit} className="space-y-4 rounded-lg border border-nv-800 bg-nv-900/60 p-5">
+        <form onSubmit={submit} className="space-y-4 rounded-lg border border-nv-800 bg-nv-900/60 p-5 shadow-[var(--shadow-sm)]">
           <Field label={`Distance: ${distanceKm.toFixed(1)} km`}>
             <input
               type="range"
@@ -97,104 +102,85 @@ export function AIIntelligenceView() {
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Hour of day">
-              <select
-                value={hour}
-                onChange={(e) => setHour(Number(e.target.value))}
-                className="w-full rounded-md border border-nv-700 bg-nv-950 px-3 py-1.5 text-sm text-slate-200 focus:border-teal-500 focus:outline-none"
-              >
+              <Select value={hour} onChange={(e) => setHour(Number(e.target.value))}>
                 {Array.from({ length: 24 }, (_, i) => (
                   <option key={i} value={i}>
                     {i.toString().padStart(2, "0")}:00
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <Field label="Day of week">
-              <select
-                value={dayOfWeek}
-                onChange={(e) => setDayOfWeek(Number(e.target.value))}
-                className="w-full rounded-md border border-nv-700 bg-nv-950 px-3 py-1.5 text-sm text-slate-200 focus:border-teal-500 focus:outline-none"
-              >
+              <Select value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))}>
                 {DAYS.map((d, i) => (
                   <option key={d} value={i}>
                     {d}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <Field label="Priority">
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as Priority)}
-                className="w-full rounded-md border border-nv-700 bg-nv-950 px-3 py-1.5 text-sm text-slate-200 focus:border-teal-500 focus:outline-none"
-              >
+              <Select value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
 
             <Field label="Vehicle type">
-              <select
-                value={vehicleType}
-                onChange={(e) => setVehicleType(e.target.value)}
-                className="w-full rounded-md border border-nv-700 bg-nv-950 px-3 py-1.5 text-sm text-slate-200 focus:border-teal-500 focus:outline-none"
-              >
+              <Select value={vehicleType} onChange={(e) => setVehicleType(e.target.value)}>
                 {VEHICLE_TYPES.map((v) => (
                   <option key={v} value={v}>
                     {v.replaceAll("_", " ")}
                   </option>
                 ))}
-              </select>
+              </Select>
             </Field>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-teal-500 py-2 text-sm font-medium text-nv-950 transition-colors hover:bg-teal-400 disabled:opacity-50"
-          >
+          <Button type="submit" disabled={loading} className="w-full">
+            <Sparkles className="h-3.5 w-3.5" aria-hidden />
             {loading ? "Predicting…" : "Predict ETA"}
-          </button>
+          </Button>
         </form>
 
-        <div className="rounded-lg border border-nv-800 bg-nv-900/60 p-5">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Prediction</h2>
+        <Card className="p-5">
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Prediction</h2>
 
           {!result && !error && (
-            <div className="flex h-40 items-center justify-center text-sm text-slate-500">
+            <div className="flex h-40 items-center justify-center text-sm text-zinc-500">
               Submit the form to run inference.
             </div>
           )}
 
-          {error && <div className="text-sm text-rose-400">{error}</div>}
+          {error && <ErrorState message={error} />}
 
           {result && (
             <div className="space-y-4">
               <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Predicted ETA</div>
-                <div className="text-4xl font-semibold text-teal-400">
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Predicted ETA</div>
+                <div className="text-4xl font-semibold tabular-nums text-teal-400">
                   {Math.round(result.predicted_eta_minutes)}{" "}
-                  <span className="text-lg font-normal text-slate-400">minutes</span>
+                  <span className="text-lg font-normal text-zinc-400">minutes</span>
                 </div>
               </div>
               <div>
-                <div className="text-xs uppercase tracking-wider text-slate-500">Confidence</div>
+                <div className="text-xs uppercase tracking-wider text-zinc-500">Confidence</div>
                 <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-nv-800">
                   <div
-                    className="h-full bg-teal-400"
+                    className="h-full bg-teal-400 transition-[width] duration-500"
                     style={{ width: `${Math.round(result.confidence * 100)}%` }}
                   />
                 </div>
-                <div className="mt-1 text-sm text-slate-400">{Math.round(result.confidence * 100)}%</div>
+                <div className="mt-1 text-sm tabular-nums text-zinc-400">{Math.round(result.confidence * 100)}%</div>
               </div>
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );
@@ -203,7 +189,7 @@ export function AIIntelligenceView() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="mb-1.5 text-xs text-slate-400">{label}</div>
+      <div className="mb-1.5 text-xs text-zinc-400">{label}</div>
       {children}
     </label>
   );

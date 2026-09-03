@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/services/api";
 import { useControlTowerStore } from "@/store/useControlTowerStore";
+import { Select } from "@/components/ui/Select";
+import { StatusPill, type Tone } from "@/components/ui/StatusPill";
+import { Table, type TableColumn } from "@/components/ui/Table";
+import { TableSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState } from "@/components/ui/States";
 import type { Package, PackageStatus } from "@/types/domain";
 
 const STATUS_OPTIONS: (PackageStatus | "")[] = [
@@ -27,17 +32,16 @@ const STATUS_OPTIONS: (PackageStatus | "")[] = [
   "DAMAGED",
 ];
 
-const STATUS_TONE: Record<string, string> = {
-  DELIVERED: "text-emerald-400 border-emerald-500/40 bg-emerald-500/10",
-  CANCELLED: "text-slate-400 border-slate-600 bg-slate-800",
-  DELIVERY_FAILED: "text-rose-400 border-rose-500/40 bg-rose-500/10",
-  LOST: "text-rose-400 border-rose-500/40 bg-rose-500/10",
-  DAMAGED: "text-rose-400 border-rose-500/40 bg-rose-500/10",
-  RETURNED: "text-amber-400 border-amber-500/40 bg-amber-500/10",
-  RETURN_REQUESTED: "text-amber-400 border-amber-500/40 bg-amber-500/10",
-  RETURN_IN_TRANSIT: "text-amber-400 border-amber-500/40 bg-amber-500/10",
+const STATUS_TONE: Record<string, Tone> = {
+  DELIVERED: "good",
+  CANCELLED: "neutral",
+  DELIVERY_FAILED: "danger",
+  LOST: "danger",
+  DAMAGED: "danger",
+  RETURNED: "warning",
+  RETURN_REQUESTED: "warning",
+  RETURN_IN_TRANSIT: "warning",
 };
-const DEFAULT_TONE = "text-teal-300 border-teal-500/40 bg-teal-500/10";
 
 export function PackagesView() {
   const [status, setStatus] = useState<PackageStatus | "">("");
@@ -56,72 +60,57 @@ export function PackagesView() {
       .finally(() => setLoading(false));
   }, [status]);
 
+  const columns: TableColumn<Package>[] = [
+    { header: "Tracking #", cell: (p) => <span className="font-mono text-zinc-200">{p.tracking_number}</span> },
+    {
+      header: "Status",
+      cell: (p) => (
+        <StatusPill tone={STATUS_TONE[p.current_status] ?? "accent"}>
+          {p.current_status.replaceAll("_", " ")}
+        </StatusPill>
+      ),
+    },
+    { header: "Priority", cell: (p) => <span className="text-zinc-400">{p.priority}</span> },
+    { header: "Weight (kg)", cell: (p) => <span className="tabular-nums text-zinc-400">{p.package_weight.toFixed(2)}</span> },
+    { header: "Created", cell: (p) => <span className="text-zinc-500">{new Date(p.created_at).toLocaleString()}</span> },
+    {
+      header: "Expected Delivery",
+      cell: (p) => (
+        <span className="text-zinc-500">
+          {p.expected_delivery_at ? new Date(p.expected_delivery_at).toLocaleString() : "—"}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-100">Packages</h1>
-        <select
+        <h1 className="text-lg font-semibold text-zinc-100">Packages</h1>
+        <Select
           value={status}
           onChange={(e) => setStatus(e.target.value as PackageStatus | "")}
-          className="rounded-md border border-nv-700 bg-nv-900 px-3 py-1.5 text-sm text-slate-200 focus:border-teal-500 focus:outline-none"
+          className="w-56"
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s || "ALL"} value={s}>
               {s ? s.replaceAll("_", " ") : "All statuses"}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      {loading && <div className="text-sm text-slate-500">Loading packages…</div>}
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {loading && <TableSkeleton columns={6} />}
+      {error && <ErrorState message={error} />}
 
       {!loading && !error && (
-        <div className="overflow-x-auto rounded-lg border border-nv-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-nv-900 text-xs uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="px-4 py-2.5">Tracking #</th>
-                <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5">Priority</th>
-                <th className="px-4 py-2.5">Weight (kg)</th>
-                <th className="px-4 py-2.5">Created</th>
-                <th className="px-4 py-2.5">Expected Delivery</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-nv-800">
-              {packages.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => selectTrackingNumber(p.tracking_number)}
-                  className="cursor-pointer transition-colors hover:bg-nv-900/60"
-                >
-                  <td className="px-4 py-2.5 font-mono text-slate-200">{p.tracking_number}</td>
-                  <td className="px-4 py-2.5">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_TONE[p.current_status] ?? DEFAULT_TONE}`}
-                    >
-                      {p.current_status.replaceAll("_", " ")}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-slate-400">{p.priority}</td>
-                  <td className="px-4 py-2.5 text-slate-400">{p.package_weight.toFixed(2)}</td>
-                  <td className="px-4 py-2.5 text-slate-500">{new Date(p.created_at).toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-slate-500">
-                    {p.expected_delivery_at ? new Date(p.expected_delivery_at).toLocaleString() : "—"}
-                  </td>
-                </tr>
-              ))}
-              {packages.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                    No packages match this filter.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          columns={columns}
+          rows={packages}
+          rowKey={(p) => p.id}
+          onRowClick={(p) => selectTrackingNumber(p.tracking_number)}
+          emptyMessage="No packages match this filter."
+        />
       )}
     </div>
   );

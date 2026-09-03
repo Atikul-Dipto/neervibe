@@ -12,6 +12,20 @@ const nextConfig: NextConfig = {
   // a tunnel. Quick-tunnel hostnames are random per run, so this needs
   // updating whenever the tunnel is restarted — see README's tunnel note.
   allowedDevOrigins: ["port-streets-whose-westminster.trycloudflare.com"],
+  // Proxies REST calls to the live backend server-side so the browser only
+  // ever talks to this same-origin dev server — sidesteps CORS entirely
+  // instead of needing the backend's CORS_ORIGINS to list every dev
+  // machine. Doesn't cover WebSockets (Next.js rewrites don't proxy the
+  // upgrade handshake); those still connect directly and aren't subject to
+  // CORS the way fetch/XHR are.
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: "https://neervibe-backend.onrender.com/api/v1/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

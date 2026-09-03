@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Search } from "lucide-react";
 import { useControlTowerStore } from "@/store/useControlTowerStore";
 
 export function TrackingSearch() {
@@ -14,12 +15,13 @@ export function TrackingSearch() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="relative">
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-500" aria-hidden />
       <input
         value={value}
         onChange={(e) => setValue(e.target.value)}
         placeholder="Track package (PKG-...)"
-        className="w-full rounded-md border border-nv-700 bg-nv-900 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-teal-500 focus:outline-none"
+        className="w-full rounded-md border border-nv-700 bg-nv-900 py-1.5 pl-8 pr-3 text-sm text-zinc-100 placeholder:text-zinc-500 transition-all duration-200 hover:border-nv-600 hover:shadow-[0_0_0_3px_rgba(45,212,191,0.08)] focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500/40"
       />
     </form>
   );

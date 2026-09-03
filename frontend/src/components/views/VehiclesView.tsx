@@ -3,6 +3,11 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/services/api";
 import { useControlTowerStore } from "@/store/useControlTowerStore";
+import { Select } from "@/components/ui/Select";
+import { StatusPill, type Tone } from "@/components/ui/StatusPill";
+import { Table, type TableColumn } from "@/components/ui/Table";
+import { TableSkeleton } from "@/components/ui/Skeleton";
+import { ErrorState } from "@/components/ui/States";
 import type { Vehicle, VehicleStatus } from "@/types/domain";
 
 const STATUS_OPTIONS: (VehicleStatus | "")[] = [
@@ -15,14 +20,22 @@ const STATUS_OPTIONS: (VehicleStatus | "")[] = [
   "OFFLINE",
 ];
 
-const STATUS_TONE: Record<string, string> = {
-  EN_ROUTE: "text-teal-300 border-teal-500/40 bg-teal-500/10",
-  IDLE: "text-slate-400 border-slate-600 bg-slate-800",
-  LOADING: "text-amber-400 border-amber-500/40 bg-amber-500/10",
-  UNLOADING: "text-amber-400 border-amber-500/40 bg-amber-500/10",
-  MAINTENANCE: "text-rose-400 border-rose-500/40 bg-rose-500/10",
-  OFFLINE: "text-slate-500 border-slate-700 bg-slate-900",
+const STATUS_TONE: Record<string, Tone> = {
+  EN_ROUTE: "accent",
+  IDLE: "neutral",
+  LOADING: "warning",
+  UNLOADING: "warning",
+  MAINTENANCE: "danger",
+  OFFLINE: "neutral",
 };
+
+interface VehicleRow {
+  vehicle: Vehicle;
+  status: string;
+  speed: number;
+  lat: number | null;
+  lon: number | null;
+}
 
 export function VehiclesView() {
   const [status, setStatus] = useState<VehicleStatus | "">("");
@@ -42,79 +55,64 @@ export function VehiclesView() {
       .finally(() => setLoading(false));
   }, [status]);
 
+  const rows: VehicleRow[] = vehicles.map((v) => {
+    const live = liveVehicles.get(v.id);
+    return {
+      vehicle: v,
+      status: live?.status ?? v.status,
+      speed: live?.speed ?? v.speed,
+      lat: live?.latitude ?? v.current_latitude,
+      lon: live?.longitude ?? v.current_longitude,
+    };
+  });
+
+  const columns: TableColumn<VehicleRow>[] = [
+    { header: "Registration", cell: (r) => <span className="font-mono text-zinc-200">{r.vehicle.registration_number}</span> },
+    { header: "Type", cell: (r) => <span className="text-zinc-400">{r.vehicle.vehicle_type.replaceAll("_", " ")}</span> },
+    {
+      header: "Status",
+      cell: (r) => <StatusPill tone={STATUS_TONE[r.status] ?? "neutral"}>{r.status.replaceAll("_", " ")}</StatusPill>,
+    },
+    { header: "Speed (km/h)", cell: (r) => <span className="tabular-nums text-zinc-400">{r.speed.toFixed(1)}</span> },
+    { header: "Capacity (kg)", cell: (r) => <span className="tabular-nums text-zinc-400">{r.vehicle.capacity.toFixed(0)}</span> },
+    {
+      header: "Position",
+      cell: (r) => (
+        <span className="tabular-nums text-zinc-500">
+          {r.lat != null && r.lon != null ? `${r.lat.toFixed(3)}, ${r.lon.toFixed(3)}` : "—"}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-100">Vehicles</h1>
-        <select
+        <h1 className="text-lg font-semibold text-zinc-100">Vehicles</h1>
+        <Select
           value={status}
           onChange={(e) => setStatus(e.target.value as VehicleStatus | "")}
-          className="rounded-md border border-nv-700 bg-nv-900 px-3 py-1.5 text-sm text-slate-200 focus:border-teal-500 focus:outline-none"
+          className="w-56"
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s || "ALL"} value={s}>
               {s ? s.replaceAll("_", " ") : "All statuses"}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      {loading && <div className="text-sm text-slate-500">Loading vehicles…</div>}
-      {error && <div className="text-sm text-rose-400">{error}</div>}
+      {loading && <TableSkeleton columns={6} />}
+      {error && <ErrorState message={error} />}
 
       {!loading && !error && (
-        <div className="overflow-x-auto rounded-lg border border-nv-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-nv-900 text-xs uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="px-4 py-2.5">Registration</th>
-                <th className="px-4 py-2.5">Type</th>
-                <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5">Speed (km/h)</th>
-                <th className="px-4 py-2.5">Capacity (kg)</th>
-                <th className="px-4 py-2.5">Position</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-nv-800">
-              {vehicles.map((v) => {
-                const live = liveVehicles.get(v.id);
-                const speed = live?.speed ?? v.speed;
-                const status = live?.status ?? v.status;
-                const lat = live?.latitude ?? v.current_latitude;
-                const lon = live?.longitude ?? v.current_longitude;
-                return (
-                  <tr
-                    key={v.id}
-                    onClick={() => selectVehicle(v)}
-                    className="cursor-pointer transition-colors hover:bg-nv-900/60"
-                  >
-                    <td className="px-4 py-2.5 font-mono text-slate-200">{v.registration_number}</td>
-                    <td className="px-4 py-2.5 text-slate-400">{v.vehicle_type.replaceAll("_", " ")}</td>
-                    <td className="px-4 py-2.5">
-                      <span
-                        className={`rounded-full border px-2 py-0.5 text-xs ${STATUS_TONE[status] ?? STATUS_TONE.IDLE}`}
-                      >
-                        {status.replaceAll("_", " ")}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-400">{speed.toFixed(1)}</td>
-                    <td className="px-4 py-2.5 text-slate-400">{v.capacity.toFixed(0)}</td>
-                    <td className="px-4 py-2.5 text-slate-500">
-                      {lat != null && lon != null ? `${lat.toFixed(3)}, ${lon.toFixed(3)}` : "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-              {vehicles.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                    No vehicles match this filter.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.vehicle.id}
+          onRowClick={(r) => selectVehicle(r.vehicle)}
+          emptyMessage="No vehicles match this filter."
+        />
       )}
     </div>
   );
