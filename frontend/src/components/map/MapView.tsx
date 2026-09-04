@@ -24,6 +24,7 @@ import { bboxOfPositions, bearingBetween, findRegionAt, inferVehicleLeg, type BB
 import {
   fetchLiveRoute,
   matchRoad,
+  projectOnRoad,
   remainingKm as roadRemainingKm,
   splitRoad,
   useRoads,
@@ -99,6 +100,13 @@ interface RouteInfo {
   extraKm: number;
   extraMin: number;
   destination: string;
+}
+
+/** An explicit sign, because an alternative road is not always the longer one
+ *  — OSRM ranks by time, so a shorter road can still be the slower choice. */
+function signed(value: number, dp: number): string {
+  const rounded = value.toFixed(dp);
+  return Number(rounded) > 0 ? `+${rounded}` : rounded.replace("-", "−");
 }
 
 type PickKind = "vehicle" | "rider" | "node" | "district" | "division";
@@ -370,20 +378,23 @@ export function MapView({ className }: { className?: string }) {
           )
         : null;
     legRef.current = leg;
-    matchRoadForLeg(leg, live ? { lat: live.latitude, lon: live.longitude } : null);
+    matchRoadForLeg(leg, live ? { lat: live.latitude, lon: live.longitude } : null, live?.road_variant ?? null);
   };
 
   /**
    * Work out which road the vehicle is actually driving.
    *
    * The corridor may have more than one sensible road, and a driver taking the
-   * long way is exactly the thing an operator wants to see, so rather than
-   * trusting a flag the position is projected onto every road known for the
-   * leg and the closest wins. Off all of them by more than OFF_ROUTE_M, the
-   * vehicle is on a road not in the shipped file, and the actual road is
-   * fetched once and drawn instead.
+   * long way is exactly the thing an operator wants to see. The feed names the
+   * road it put the vehicle on, which is used when the position actually agrees
+   * with that road — a named road the vehicle is nowhere near is a stale flag,
+   * not a fact. Failing that the position is projected onto every road known
+   * for the leg and the closest wins, which also covers older payloads that
+   * carry no name. Off all of them by more than OFF_ROUTE_M the vehicle is on a
+   * road not in the shipped file, so the road it is really on is fetched once
+   * and drawn instead.
    */
-  const matchRoadForLeg = (leg: VehicleLeg | null, at: LatLon | null) => {
+  const matchRoadForLeg = (leg: VehicleLeg | null, at: LatLon | null, namedVariant: string | null) => {
     const roadNetwork = roadsRef.current;
     if (!leg || !at || !roadNetwork) {
       roadMatchRef.current = null;
@@ -394,7 +405,10 @@ export function MapView({ className }: { className?: string }) {
     const from = { lat: leg.source.latitude, lon: leg.source.longitude };
     const to = { lat: leg.dest.latitude, lon: leg.dest.longitude };
     const variants = roadNetwork.variants(from, to);
-    const match = matchRoad(variants, at.lon, at.lat);
+    const named = namedVariant ? variants.find((v) => v.name === namedVariant) : undefined;
+    const declared = named ? projectOnRoad(named, at.lon, at.lat) : null;
+    const match =
+      declared && declared.offsetM <= OFF_ROUTE_M ? declared : matchRoad(variants, at.lon, at.lat);
 
     if (match && match.offsetM <= OFF_ROUTE_M) {
       roadMatchRef.current = match;
@@ -978,10 +992,10 @@ export function MapView({ className }: { className?: string }) {
       )}
 
       {routeInfo && selectedVehicle && (
-        <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 px-4">
+        <div className="pointer-events-none absolute bottom-10 left-1/2 w-full -translate-x-1/2 px-4">
           <div
             className={clsx(
-              "flex items-center gap-2 rounded-full border bg-nv-900/90 px-3 py-1.5 text-xs shadow-[var(--shadow-md)] backdrop-blur",
+              "mx-auto flex w-fit max-w-full items-center gap-2 truncate rounded-full border bg-nv-900/90 px-3 py-1.5 text-xs shadow-[var(--shadow-md)] backdrop-blur",
               routeInfo.kind === "fastest" ? "border-nv-700 text-ink-600" : "border-amber-500/50 text-amber-300",
             )}
           >
@@ -993,7 +1007,7 @@ export function MapView({ className }: { className?: string }) {
             )}
             {routeInfo.kind === "alternative" && (
               <span>
-                Taking the longer road · +{routeInfo.extraKm.toFixed(1)} km, +{Math.round(routeInfo.extraMin)} min · {routeInfo.remainingKm.toFixed(1)} km to {routeInfo.destination}
+                Not the fastest road · {signed(routeInfo.extraKm, 1)} km, {signed(routeInfo.extraMin, 0)} min · {routeInfo.remainingKm.toFixed(1)} km to {routeInfo.destination}
               </span>
             )}
             {routeInfo.kind === "off-route" && (
@@ -1029,7 +1043,7 @@ export function MapView({ className }: { className?: string }) {
         </div>
       )}
       {loadState.status === "loading" && !errorMessage && (
-        <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2">
+        <div className="pointer-events-none absolute bottom-20 left-1/2 -translate-x-1/2">
           <div className="flex items-center gap-2 rounded-full border border-nv-700 bg-nv-900/80 px-3 py-1.5 text-xs text-ink-600 backdrop-blur">
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
             Loading network…

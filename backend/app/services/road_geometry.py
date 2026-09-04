@@ -10,10 +10,11 @@ progress fraction along an edge into a real position and heading.
 The same file is served to the browser, so the map and the simulator agree on
 where a road goes without either of them calling a routing service at runtime.
 
-Where a corridor genuinely has a second sensible road, the generator records
-it as an extra variant. `choose_variant` sends a small, deterministic share of
-trips down it — a real detour on a real road, which is what the map's
-"took the long way" detection is detecting.
+Where a corridor genuinely has a second sensible road, the generator records it
+as an extra variant, and `choose_variant` sends a share of trips down it. The
+share rises with congestion, because that is when a driver actually abandons
+the fastest road — a real detour on a real road, which is what the map's
+"not the fastest road" detection is detecting.
 """
 from __future__ import annotations
 
@@ -28,9 +29,12 @@ logger = logging.getLogger(__name__)
 
 GEOMETRY_PATH = Path(__file__).resolve().parent.parent / "data" / "road_geometry.json"
 
-# Share of trips routed down the longer road where one exists. Kept low: a
-# detour should be the exception an operator notices, not the norm.
-DETOUR_SHARE = 0.2
+# How often a trip takes the alternative road, where the corridor has one.
+# A driver leaves the fastest road mainly when it is jammed, so the share is
+# a floor plus a congestion term: quiet corridors rarely divert, a corridor at
+# 0.8 congestion diverts about half the time.
+DETOUR_BASE_SHARE = 0.1
+DETOUR_CONGESTION_WEIGHT = 0.55
 
 
 def edge_key(src_lon: float, src_lat: float, dst_lon: float, dst_lat: float) -> str:
@@ -113,14 +117,24 @@ class RoadGeometry:
     def variants(self, src_lon: float, src_lat: float, dst_lon: float, dst_lat: float) -> list[RoadVariant]:
         return self.by_edge.get(edge_key(src_lon, src_lat, dst_lon, dst_lat), [])
 
-    def choose_variant(self, src_lon: float, src_lat: float, dst_lon: float, dst_lat: float, rng) -> RoadVariant | None:
-        """The road this trip takes. Mostly the fastest one; occasionally the
-        longer alternative, when the corridor actually has one."""
+    def choose_variant(
+        self,
+        src_lon: float,
+        src_lat: float,
+        dst_lon: float,
+        dst_lat: float,
+        rng,
+        congestion: float = 0.0,
+    ) -> RoadVariant | None:
+        """The road this trip takes: usually the fastest, more often the
+        alternative the more congested the corridor is."""
         options = self.variants(src_lon, src_lat, dst_lon, dst_lat)
         if not options:
             return None
-        if len(options) > 1 and rng.random() < DETOUR_SHARE:
-            return rng.choice(options[1:])
+        if len(options) > 1:
+            share = DETOUR_BASE_SHARE + DETOUR_CONGESTION_WEIGHT * max(0.0, min(1.0, congestion))
+            if rng.random() < share:
+                return rng.choice(options[1:])
         return options[0]
 
     @staticmethod

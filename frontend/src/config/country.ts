@@ -25,6 +25,8 @@ export const COUNTRY = {
    *  scripts/prep-roads.mjs. Vehicles and corridors are drawn along these
    *  rather than along straight lines between coordinates. */
   roadsFile: "/geo/bd/roads.json",
+  // Kept short: it sits in the map's bottom-left corner alongside the
+  // basemap's own credits, which already name OpenStreetMap.
   attribution:
-    'Boundaries © <a href="https://www.geoboundaries.org" target="_blank" rel="noreferrer">geoBoundaries</a> (BBS / OCHA) · Roads © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
+    'Boundaries © <a href="https://www.geoboundaries.org" target="_blank" rel="noreferrer">geoBoundaries</a> · Roads © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OSM</a>',
 };

@@ -122,7 +122,12 @@ class SimulationEngine:
         if source is None or dest is None:
             return None
         return self.roads.choose_variant(
-            source.longitude, source.latitude, dest.longitude, dest.latitude, random
+            source.longitude,
+            source.latitude,
+            dest.longitude,
+            dest.latitude,
+            random,
+            edge.congestion_level,
         )
 
     async def move_vehicles(self, session: AsyncSession, vehicles: list[Vehicle]) -> None:
