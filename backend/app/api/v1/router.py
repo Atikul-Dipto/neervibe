@@ -9,12 +9,14 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     analytics,
+    deliveries,
     events,
     health,
     ml,
     nodes,
     orders,
     packages,
+    parties,
     riders,
     routes,
     tracking,
@@ -33,3 +35,6 @@ api_router.include_router(events.router)
 api_router.include_router(tracking.router)
 api_router.include_router(ml.router)
 api_router.include_router(analytics.router)
+api_router.include_router(parties.merchants_router)
+api_router.include_router(parties.customers_router)
+api_router.include_router(deliveries.router)

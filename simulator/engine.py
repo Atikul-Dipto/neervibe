@@ -24,18 +24,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, engine as db_engine
 from app.core.redis import get_redis
+from app.models.delivery import DeliveryAttempt
 from app.models.edge import LogisticsEdge
-from app.models.enums import EventType, PackageStatus, VehicleStatus
+from app.models.enums import DeliveryAttemptResult, EventType, PackageStatus, RiderStatus, VehicleStatus
 from app.models.event import PackageEvent
 from app.models.node import LogisticsNode
 from app.models.package import Package
-from app.models.vehicle import Vehicle
+from app.models.vehicle import Rider, Vehicle
 from app.state_machine.package_state_machine import is_valid_transition, next_possible_statuses
 from simulator import redis_channels
 
@@ -175,6 +176,13 @@ class SimulationEngine:
         if new_status == PackageStatus.DELIVERED:
             package.actual_delivery_at = datetime.now(timezone.utc)
 
+        # Last mile is rider-based: hand the parcel to a rider when it leaves
+        # the destination hub, and log the doorstep outcome against them.
+        if new_status == PackageStatus.OUT_FOR_DELIVERY:
+            await self.assign_rider(session, package, node)
+        elif new_status in (PackageStatus.DELIVERED, PackageStatus.DELIVERY_FAILED):
+            await self.record_delivery_attempt(session, package, new_status, node)
+
         now = datetime.now(timezone.utc)
         event = PackageEvent(
             package_id=package.id,
@@ -185,13 +193,84 @@ class SimulationEngine:
             timestamp=now,
             previous_status=previous.value if hasattr(previous, "value") else previous,
             new_status=new_status.value,
+            rider_id=package.assigned_rider_id,
+            vehicle_id=package.assigned_vehicle_id,
             event_metadata={},
             created_at=now,
         )
         session.add(event)
         await self.publish_package(package, previous)
 
+    async def assign_rider(self, session: AsyncSession, package: Package, node: LogisticsNode | None) -> None:
+        """Pick an available rider based in the same city as the hub the
+        parcel is leaving from; fall back to any available rider."""
+        if package.assigned_rider_id is not None:
+            rider = await session.get(Rider, package.assigned_rider_id)
+            if rider is not None:
+                rider.status = RiderStatus.ON_DELIVERY
+                return
+        result = await session.execute(select(Rider).where(Rider.status == RiderStatus.AVAILABLE))
+        riders = list(result.scalars().all())
+        if not riders:
+            return
+        city = node.city if node is not None else None
+        local = [
+            r for r in riders
+            if r.current_node_id in self.nodes and self.nodes[r.current_node_id].city == city
+        ]
+        rider = random.choice(local or riders)
+        package.assigned_rider_id = rider.id
+        rider.status = RiderStatus.ON_DELIVERY
+        if node is not None:
+            rider.current_node_id = node.id
+            rider.current_latitude = node.latitude
+            rider.current_longitude = node.longitude
+
+    async def record_delivery_attempt(
+        self, session: AsyncSession, package: Package, new_status: PackageStatus, node: LogisticsNode | None
+    ) -> None:
+        count = await session.scalar(
+            select(func.count(DeliveryAttempt.id)).where(DeliveryAttempt.package_id == package.id)
+        )
+        if new_status == PackageStatus.DELIVERED:
+            outcome = DeliveryAttemptResult.SUCCESS
+            notes = "Delivered to recipient"
+        else:
+            outcome = random.choices(
+                [
+                    DeliveryAttemptResult.FAILED_NO_RECIPIENT,
+                    DeliveryAttemptResult.FAILED_ADDRESS_ISSUE,
+                    DeliveryAttemptResult.FAILED_REFUSED,
+                ],
+                weights=[0.55, 0.30, 0.15],
+            )[0]
+            notes = {
+                DeliveryAttemptResult.FAILED_NO_RECIPIENT: "Recipient unavailable at address",
+                DeliveryAttemptResult.FAILED_ADDRESS_ISSUE: "Address could not be located",
+                DeliveryAttemptResult.FAILED_REFUSED: "Recipient refused the parcel",
+            }[outcome]
+        session.add(
+            DeliveryAttempt(
+                package_id=package.id,
+                rider_id=package.assigned_rider_id,
+                attempt_number=(count or 0) + 1,
+                result=outcome,
+                notes=notes,
+                attempted_at=datetime.now(timezone.utc),
+            )
+        )
+        if package.assigned_rider_id is not None:
+            rider = await session.get(Rider, package.assigned_rider_id)
+            if rider is not None:
+                rider.status = RiderStatus.AVAILABLE
+                if node is not None:
+                    rider.current_node_id = node.id
+                    rider.current_latitude = node.latitude
+                    rider.current_longitude = node.longitude
+
     async def publish_vehicle(self, vehicle: Vehicle) -> None:
+        runtime = self.vehicle_runtime.get(vehicle.id)
+        edge = runtime.current_edge if runtime else None
         payload = {
             "vehicle_id": str(vehicle.id),
             "registration_number": vehicle.registration_number,
@@ -200,6 +279,8 @@ class SimulationEngine:
             "speed": round(vehicle.speed, 1),
             "heading": round(vehicle.heading, 1),
             "status": vehicle.status,
+            "current_node_id": str(vehicle.current_node_id) if vehicle.current_node_id else None,
+            "destination_node_id": str(edge.destination_node_id) if edge is not None else None,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         await self.redis.publish(redis_channels.VEHICLES, json.dumps(payload))
