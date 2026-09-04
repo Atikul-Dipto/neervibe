@@ -354,11 +354,23 @@ body,
   }
 }
 
-/* MapLibre chrome inherits the theme rather than shipping its own light box. */
-.maplibregl-ctrl-attrib.maplibregl-compact {
+/* MapLibre ships its own light chrome, and its stylesheet is imported from the
+   map component so it lands after this file. The extra `.maplibregl-map`
+   ancestor is what makes these win, so the attribution and zoom controls follow
+   the theme instead of staying a white box on a dark map. */
+.maplibregl-map .maplibregl-ctrl-attrib,
+.maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact {
   background: color-mix(in oklab, var(--nv-900) 88%, transparent);
   color: var(--ink-500);
 }
-.maplibregl-ctrl-attrib a {
+.maplibregl-map .maplibregl-ctrl-attrib a {
   color: var(--ink-600);
+}
+.maplibregl-map .maplibregl-ctrl-attrib-button {
+  background-color: color-mix(in oklab, var(--nv-900) 88%, transparent);
+}
+:root[data-theme="dark"] .maplibregl-ctrl-attrib-button {
+  /* The button art is a dark glyph baked into a data URI; invert it so it
+     reads on the dark surface. */
+  filter: invert(1) opacity(0.65);
 }
