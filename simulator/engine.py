@@ -392,6 +392,46 @@ class SimulationEngine:
         seconds = (km / RIDER_SPEED_KMH) * 3600 / settings.simulation_time_acceleration
         return max(1, round(seconds / settings.simulation_tick_seconds))
 
+    async def adopt_orphaned_deliveries(self, session: AsyncSession) -> None:
+        """Pick up last-mile work that has no rider on the road for it.
+
+        A parcel out for delivery is resolved by its rider arriving, so a
+        parcel whose rider has no leg would sit at OUT_FOR_DELIVERY forever —
+        which is exactly what every in-flight parcel does across a restart,
+        since the runtime legs live in memory. This re-creates a leg for them,
+        and assigns a rider to any that lost theirs.
+        """
+        result = await session.execute(
+            select(Package).where(Package.current_status == PackageStatus.OUT_FOR_DELIVERY)
+        )
+        adopted = 0
+        for package in result.scalars().all():
+            rider_id = package.assigned_rider_id
+            if rider_id is not None and rider_id in self.rider_runtime:
+                continue
+
+            rider = await session.get(Rider, rider_id) if rider_id else None
+            if rider is None:
+                # Lost its rider entirely: hand it to whoever is free.
+                origin = self.nodes.get(package.current_node_id) if package.current_node_id else None
+                await self.assign_rider(session, package, origin)
+                adopted += 1
+                continue
+
+            rider.status = RiderStatus.ON_DELIVERY
+            origin = (
+                self.nodes.get(rider.current_node_id)
+                if rider.current_node_id
+                else self.nodes.get(package.current_node_id) if package.current_node_id else None
+            )
+            if origin is None:
+                continue
+            self.start_rider_leg(rider, package, origin, package.destination_node_id)
+            adopted += 1
+
+        if adopted:
+            logger.info("Adopted %d last-mile deliveries with no rider on the road", adopted)
+
     async def move_riders(self, session: AsyncSession) -> None:
         for rider_id, runtime in list(self.rider_runtime.items()):
             rider = await session.get(Rider, rider_id)
@@ -591,6 +631,10 @@ class SimulationEngine:
             vehicles = await self.ensure_vehicles(session)
             await self.assign_idle_vehicles_to_packages(session, vehicles)
             await self.move_vehicles(session, vehicles)
+            # Legs live in memory, so anything in flight across a restart needs
+            # picking back up before it can move.
+            if self.tick_count % 5 == 0:
+                await self.adopt_orphaned_deliveries(session)
             await self.move_riders(session)
             await self.perturb_congestion(session)
             # Loads move slowly; recomputing every tick would be wasteful.
