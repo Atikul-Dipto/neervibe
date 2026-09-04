@@ -6,7 +6,7 @@ import { api } from "@/services/api";
 import { useControlTowerStore } from "@/store/useControlTowerStore";
 import { useDataStore } from "@/data/store";
 import { useSystemStore } from "@/data/system";
-import type { PackageLiveUpdate, VehicleLiveUpdate } from "@/types/domain";
+import type { PackageLiveUpdate, RiderLiveUpdate, VehicleLiveUpdate } from "@/types/domain";
 
 const SELECTED_VEHICLE_POLL_MS = 3000;
 
@@ -18,6 +18,7 @@ const SELECTED_VEHICLE_POLL_MS = 3000;
  */
 export function LiveDataProvider() {
   const upsertVehicle = useControlTowerStore((s) => s.upsertVehicle);
+  const upsertRider = useControlTowerStore((s) => s.upsertRider);
   const pushEvent = useControlTowerStore((s) => s.pushEvent);
   const applyPackageEvent = useDataStore((s) => s.applyPackageEvent);
   const setWs = useSystemStore((s) => s.setWs);
@@ -25,6 +26,7 @@ export function LiveDataProvider() {
   const refreshSelectedVehicle = useControlTowerStore((s) => s.refreshSelectedVehicle);
 
   const wsState = useLiveChannel<VehicleLiveUpdate>("vehicles", upsertVehicle);
+  useLiveChannel<RiderLiveUpdate>("riders", upsertRider);
   useLiveChannel<PackageLiveUpdate>("packages", (u) => {
     pushEvent(u);
     applyPackageEvent(u);

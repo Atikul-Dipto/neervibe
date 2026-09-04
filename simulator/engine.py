@@ -46,6 +46,44 @@ from simulator import redis_channels
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("simulator")
 
+#: Average speed of a last-mile rider through city traffic.
+RIDER_SPEED_KMH = 22.0
+#: First-attempt doorstep success rate. Matches the rate the seeded delivery
+#: history already shows, so resolving attempts on rider arrival does not move
+#: the network's delivery and failure rates.
+DOORSTEP_SUCCESS_RATE = 0.78
+
+
+def straight_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle km. Only a fallback: a leg with road geometry uses its
+    actual length instead."""
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lon2 - lon1)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(h))
+
+
+@dataclass
+class RiderRuntime:
+    """A rider part-way through a last-mile leg.
+
+    Riders used to teleport: `assign_rider` dropped them on the hub's
+    coordinates and `record_delivery_attempt` dropped them back. They now drive
+    the hub-to-doorstep road the geometry file holds for that pair, and the
+    doorstep outcome is resolved when they arrive rather than when some vehicle
+    happens to reach the hub.
+    """
+    rider_id: uuid.UUID
+    package_id: uuid.UUID
+    origin_node_id: uuid.UUID
+    dest_node_id: uuid.UUID
+    road: RoadVariant | None = None
+    progress: float = 0.0
+    #: "outbound" = hub to doorstep, "return" = doorstep back to the hub.
+    phase: str = "outbound"
+
 
 @dataclass
 class VehicleRuntime:
@@ -69,6 +107,7 @@ class SimulationEngine:
         self.edges: list[LogisticsEdge] = []
         self.edges_by_source: dict[uuid.UUID, list[LogisticsEdge]] = {}
         self.vehicle_runtime: dict[uuid.UUID, VehicleRuntime] = {}
+        self.rider_runtime: dict[uuid.UUID, RiderRuntime] = {}
         self.roads: RoadGeometry = get_road_geometry()
         self.tick_count = 0
 
@@ -197,6 +236,11 @@ class SimulationEngine:
             select(Package).where(Package.assigned_vehicle_id == vehicle.id)
         )
         for package in result.scalars().all():
+            # Once a parcel is out for delivery it belongs to a rider, who
+            # resolves it on arrival at the door (see move_riders). A vehicle
+            # reaching a hub must not deliver it from the other side of town.
+            if package.current_status == PackageStatus.OUT_FOR_DELIVERY:
+                continue
             possible = next_possible_statuses(package.current_status)
             if not possible:
                 continue
@@ -267,6 +311,7 @@ class SimulationEngine:
             rider.current_node_id = node.id
             rider.current_latitude = node.latitude
             rider.current_longitude = node.longitude
+            self.start_rider_leg(rider, package, node, package.destination_node_id)
 
     async def record_delivery_attempt(
         self, session: AsyncSession, package: Package, new_status: PackageStatus, node: LogisticsNode | None
@@ -309,6 +354,132 @@ class SimulationEngine:
                     rider.current_node_id = node.id
                     rider.current_latitude = node.latitude
                     rider.current_longitude = node.longitude
+
+    # --- Riders -------------------------------------------------------------
+
+    def start_rider_leg(
+        self,
+        rider: Rider,
+        package: Package,
+        origin: LogisticsNode,
+        dest_node_id: uuid.UUID | None,
+    ) -> None:
+        """Put a rider on the road from `origin` to the parcel's destination."""
+        dest = self.nodes.get(dest_node_id) if dest_node_id else None
+        if dest is None or origin.id == dest.id:
+            return
+        runtime = RiderRuntime(
+            rider_id=rider.id,
+            package_id=package.id,
+            origin_node_id=origin.id,
+            dest_node_id=dest.id,
+        )
+        runtime.road = self.roads.choose_variant(
+            origin.longitude, origin.latitude, dest.longitude, dest.latitude, random
+        )
+        self.rider_runtime[rider.id] = runtime
+
+    def rider_leg_ticks(self, runtime: RiderRuntime) -> int:
+        """How many ticks this leg takes at RIDER_SPEED_KMH."""
+        origin = self.nodes.get(runtime.origin_node_id)
+        dest = self.nodes.get(runtime.dest_node_id)
+        if runtime.road is not None:
+            km = runtime.road.length_m / 1000
+        elif origin is not None and dest is not None:
+            km = straight_km(origin.latitude, origin.longitude, dest.latitude, dest.longitude)
+        else:
+            km = 1.0
+        seconds = (km / RIDER_SPEED_KMH) * 3600 / settings.simulation_time_acceleration
+        return max(1, round(seconds / settings.simulation_tick_seconds))
+
+    async def move_riders(self, session: AsyncSession) -> None:
+        for rider_id, runtime in list(self.rider_runtime.items()):
+            rider = await session.get(Rider, rider_id)
+            if rider is None:
+                del self.rider_runtime[rider_id]
+                continue
+
+            runtime.progress += 1.0 / self.rider_leg_ticks(runtime)
+            dest = self.nodes.get(runtime.dest_node_id)
+            origin = self.nodes.get(runtime.origin_node_id)
+
+            if runtime.progress < 1.0:
+                if runtime.road is not None:
+                    lat, lon, _ = RoadGeometry.position_at(runtime.road, runtime.progress)
+                elif origin is not None and dest is not None:
+                    lat, lon = interpolate(
+                        origin.latitude, origin.longitude, dest.latitude, dest.longitude, runtime.progress
+                    )
+                else:
+                    continue
+                rider.current_latitude = lat
+                rider.current_longitude = lon
+                rider.current_node_id = None
+                await self.publish_rider(rider, runtime)
+                continue
+
+            # Arrived.
+            if dest is not None:
+                rider.current_latitude = dest.latitude
+                rider.current_longitude = dest.longitude
+                rider.current_node_id = dest.id
+
+            if runtime.phase == "outbound":
+                await self.resolve_doorstep(session, runtime, dest)
+                # Head back to the hub they came from, ready for the next job.
+                if origin is not None and dest is not None:
+                    runtime.phase = "return"
+                    runtime.origin_node_id = dest.id
+                    runtime.dest_node_id = origin.id
+                    runtime.progress = 0.0
+                    runtime.road = self.roads.choose_variant(
+                        dest.longitude, dest.latitude, origin.longitude, origin.latitude, random
+                    )
+                else:
+                    del self.rider_runtime[rider_id]
+            else:
+                rider.status = RiderStatus.AVAILABLE
+                del self.rider_runtime[rider_id]
+
+            await self.publish_rider(rider, self.rider_runtime.get(rider_id))
+
+    async def resolve_doorstep(
+        self, session: AsyncSession, runtime: RiderRuntime, node: LogisticsNode | None
+    ) -> None:
+        """The delivery attempt, made where and when the rider arrives.
+
+        DOORSTEP_SUCCESS_RATE is set to the first-attempt success rate the
+        seeded history already shows (~78%), so turning this on changes *when*
+        an outcome happens without moving the network's headline delivery and
+        failure rates.
+        """
+        package = await session.get(Package, runtime.package_id)
+        if package is None or package.current_status != PackageStatus.OUT_FOR_DELIVERY:
+            return
+        delivered = random.random() < DOORSTEP_SUCCESS_RATE
+        await self.transition_package(
+            session,
+            package,
+            PackageStatus.DELIVERED if delivered else PackageStatus.DELIVERY_FAILED,
+            node,
+        )
+
+    async def publish_rider(self, rider: Rider, runtime: RiderRuntime | None) -> None:
+        payload = {
+            "rider_id": str(rider.id),
+            "name": rider.name,
+            "latitude": rider.current_latitude,
+            "longitude": rider.current_longitude,
+            "status": rider.status,
+            "current_node_id": str(rider.current_node_id) if rider.current_node_id else None,
+            "destination_node_id": str(runtime.dest_node_id) if runtime else None,
+            "package_id": str(runtime.package_id) if runtime else None,
+            "phase": runtime.phase if runtime else None,
+            "road_variant": runtime.road.name if runtime and runtime.road else None,
+            "road_progress": round(runtime.progress, 4) if runtime else None,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        await self.redis.publish(redis_channels.RIDERS, json.dumps(payload))
 
     async def publish_vehicle(self, vehicle: Vehicle) -> None:
         runtime = self.vehicle_runtime.get(vehicle.id)
@@ -420,6 +591,7 @@ class SimulationEngine:
             vehicles = await self.ensure_vehicles(session)
             await self.assign_idle_vehicles_to_packages(session, vehicles)
             await self.move_vehicles(session, vehicles)
+            await self.move_riders(session)
             await self.perturb_congestion(session)
             # Loads move slowly; recomputing every tick would be wasteful.
             if self.tick_count % 10 == 0:

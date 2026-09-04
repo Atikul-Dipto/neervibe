@@ -7,6 +7,7 @@ Usage:
     python scripts/seed_database.py
 """
 import asyncio
+import json
 import math
 import sys
 from pathlib import Path
@@ -48,8 +49,23 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+# Road-validated coordinates, written by scripts/fix_node_placement.py. The
+# blind offset below cannot know where the water is — it is what put Rajshahi's
+# delivery hub in the Padma — so a recorded placement always wins.
+PLACEMENTS_FILE = Path(__file__).resolve().parent.parent / "backend" / "app" / "data" / "node_placements.json"
+try:
+    PLACEMENTS: dict[str, dict] = json.loads(PLACEMENTS_FILE.read_text(encoding="utf-8"))
+except (OSError, ValueError):
+    PLACEMENTS = {}
+
+
 def jitter(lat: float, lon: float, idx: int, scale: float = 0.03) -> tuple[float, float]:
-    """Small deterministic offset so nodes in the same city aren't stacked."""
+    """Small deterministic offset so nodes in the same city aren't stacked.
+
+    A last resort: it is a blind compass offset with no idea what is under it.
+    Prefer a recorded placement (see `make_node`), and after seeding a network
+    this has invented positions for, run scripts/fix_node_placement.py.
+    """
     angle = (idx * 47) % 360
     dlat = scale * math.cos(math.radians(angle))
     dlon = scale * math.sin(math.radians(angle))
@@ -77,6 +93,9 @@ async def make_node(
     city: str,
     capacity: int,
 ) -> LogisticsNode:
+    recorded = PLACEMENTS.get(code)
+    if recorded:
+        lat, lon = recorded["lat"], recorded["lon"]
     node = LogisticsNode(
         node_code=code,
         node_name=name,

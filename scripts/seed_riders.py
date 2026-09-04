@@ -73,16 +73,25 @@ async def seed(session: AsyncSession) -> None:
     vehicles = list((await session.execute(select(Vehicle))).scalars().all())
     riders = list((await session.execute(select(Rider))).scalars().all())
 
-    if not riders:
-        name_idx = 0
-        for city in cities:
+    # Top up per city rather than all-or-nothing: adding a division later
+    # (scripts/add_missing_divisions.py) should staff it without disturbing
+    # riders that already exist.
+    staffed: dict[str, int] = {}
+    for r in riders:
+        city = nodes[r.current_node_id].city if r.current_node_id in nodes else ""
+        staffed[city] = staffed.get(city, 0) + 1
+    understaffed = [c for c in cities if staffed.get(c, 0) < RIDERS_PER_CITY]
+
+    if understaffed:
+        name_idx = len(riders)
+        for city in understaffed:
             base = next(
                 (n for n in nodes.values() if n.city == city and n.node_type == NodeType.DELIVERY_HUB),
                 next((n for n in nodes.values() if n.city == city and n.node_type == NodeType.HUB), None),
             )
             if base is None:
                 continue
-            for _ in range(RIDERS_PER_CITY):
+            for _ in range(RIDERS_PER_CITY - staffed.get(city, 0)):
                 name = RIDER_NAMES[name_idx % len(RIDER_NAMES)]
                 name_idx += 1
                 rider = Rider(
@@ -96,9 +105,10 @@ async def seed(session: AsyncSession) -> None:
                 session.add(rider)
                 riders.append(rider)
         await session.flush()
-        print("created", len(riders), "riders across", len(cities), "cities")
+        print(f"staffed {len(understaffed)} understaffed cities: {', '.join(understaffed)}")
+        print(f"riders now: {len(riders)}")
     else:
-        print(len(riders), "riders already exist; skipping creation")
+        print(len(riders), "riders across", len(cities), "cities; all fully staffed")
 
     def rider_city(r: Rider) -> str:
         return nodes[r.current_node_id].city if r.current_node_id in nodes else ""

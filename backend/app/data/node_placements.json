@@ -1,0 +1,582 @@
+{
+ "CUS-BAR-01": {
+  "city": "Barishal",
+  "lat": 22.712993,
+  "lon": 90.353954
+ },
+ "CUS-BAR-02": {
+  "city": "Barishal",
+  "lat": 22.709918,
+  "lon": 90.362204
+ },
+ "CUS-BAR-03": {
+  "city": "Barishal",
+  "lat": 22.70267,
+  "lon": 90.366381
+ },
+ "CUS-BAR-04": {
+  "city": "Barishal",
+  "lat": 22.694641,
+  "lon": 90.364531
+ },
+ "CUS-BAR-05": {
+  "city": "Barishal",
+  "lat": 22.689587,
+  "lon": 90.35752
+ },
+ "CUS-CHA-01": {
+  "city": "Chattogram",
+  "lat": 22.339799,
+  "lon": 91.830185
+ },
+ "CUS-CHA-02": {
+  "city": "Chattogram",
+  "lat": 22.310875,
+  "lon": 91.802737
+ },
+ "CUS-CHA-03": {
+  "city": "Chattogram",
+  "lat": 22.338757,
+  "lon": 91.811529
+ },
+ "CUS-CHA-04": {
+  "city": "Chattogram",
+  "lat": 22.339799,
+  "lon": 91.805141
+ },
+ "CUS-CHA-05": {
+  "city": "Chattogram",
+  "lat": 22.344995,
+  "lon": 91.801897
+ },
+ "CUS-CUM-01": {
+  "city": "Cumilla",
+  "lat": 23.443599,
+  "lon": 91.227885
+ },
+ "CUS-CUM-02": {
+  "city": "Cumilla",
+  "lat": 23.414675,
+  "lon": 91.200437
+ },
+ "CUS-CUM-03": {
+  "city": "Cumilla",
+  "lat": 23.442174,
+  "lon": 91.2065
+ },
+ "CUS-CUM-04": {
+  "city": "Cumilla",
+  "lat": 23.444422,
+  "lon": 91.133624
+ },
+ "CUS-CUM-05": {
+  "city": "Cumilla",
+  "lat": 23.484174,
+  "lon": 91.136753
+ },
+ "CUS-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.793199,
+  "lon": 90.459485
+ },
+ "CUS-DHA-02": {
+  "city": "Dhaka",
+  "lat": 23.764275,
+  "lon": 90.432037
+ },
+ "CUS-DHA-03": {
+  "city": "Dhaka",
+  "lat": 23.764623,
+  "lon": 90.392163
+ },
+ "CUS-DHA-04": {
+  "city": "Dhaka",
+  "lat": 23.794022,
+  "lon": 90.365224
+ },
+ "CUS-DHA-05": {
+  "city": "Dhaka",
+  "lat": 23.833774,
+  "lon": 90.368353
+ },
+ "CUS-GAZ-01": {
+  "city": "Gazipur",
+  "lat": 23.983622,
+  "lon": 90.43918
+ },
+ "CUS-GAZ-02": {
+  "city": "Gazipur",
+  "lat": 23.953875,
+  "lon": 90.439837
+ },
+ "CUS-GAZ-03": {
+  "city": "Gazipur",
+  "lat": 23.954223,
+  "lon": 90.399963
+ },
+ "CUS-GAZ-04": {
+  "city": "Gazipur",
+  "lat": 23.983622,
+  "lon": 90.373024
+ },
+ "CUS-GAZ-05": {
+  "city": "Gazipur",
+  "lat": 24.023374,
+  "lon": 90.376153
+ },
+ "CUS-KHU-01": {
+  "city": "Khulna",
+  "lat": 22.828499,
+  "lon": 89.587285
+ },
+ "CUS-KHU-02": {
+  "city": "Khulna",
+  "lat": 22.799575,
+  "lon": 89.559837
+ },
+ "CUS-KHU-03": {
+  "city": "Khulna",
+  "lat": 22.799923,
+  "lon": 89.519963
+ },
+ "CUS-KHU-04": {
+  "city": "Khulna",
+  "lat": 22.829322,
+  "lon": 89.493024
+ },
+ "CUS-KHU-05": {
+  "city": "Khulna",
+  "lat": 22.869074,
+  "lon": 89.496153
+ },
+ "CUS-MYM-01": {
+  "city": "Mymensingh",
+  "lat": 24.729999,
+  "lon": 90.467285
+ },
+ "CUS-MYM-02": {
+  "city": "Mymensingh",
+  "lat": 24.701075,
+  "lon": 90.439837
+ },
+ "CUS-MYM-03": {
+  "city": "Mymensingh",
+  "lat": 24.701423,
+  "lon": 90.399963
+ },
+ "CUS-MYM-04": {
+  "city": "Mymensingh",
+  "lat": 24.730822,
+  "lon": 90.373024
+ },
+ "CUS-MYM-05": {
+  "city": "Mymensingh",
+  "lat": 24.770574,
+  "lon": 90.376153
+ },
+ "CUS-NAR-01": {
+  "city": "Narayanganj",
+  "lat": 23.606699,
+  "lon": 90.546985
+ },
+ "CUS-NAR-02": {
+  "city": "Narayanganj",
+  "lat": 23.607522,
+  "lon": 90.51888
+ },
+ "CUS-NAR-03": {
+  "city": "Narayanganj",
+  "lat": 23.578123,
+  "lon": 90.479663
+ },
+ "CUS-NAR-04": {
+  "city": "Narayanganj",
+  "lat": 23.607522,
+  "lon": 90.452724
+ },
+ "CUS-NAR-05": {
+  "city": "Narayanganj",
+  "lat": 23.647274,
+  "lon": 90.455853
+ },
+ "CUS-RAJ-01": {
+  "city": "Rajshahi",
+  "lat": 24.357399,
+  "lon": 88.651185
+ },
+ "CUS-RAJ-02": {
+  "city": "Rajshahi",
+  "lat": 24.380737,
+  "lon": 88.626141
+ },
+ "CUS-RAJ-03": {
+  "city": "Rajshahi",
+  "lat": 24.374916,
+  "lon": 88.627734
+ },
+ "CUS-RAJ-04": {
+  "city": "Rajshahi",
+  "lat": 24.381156,
+  "lon": 88.632712
+ },
+ "CUS-RAJ-05": {
+  "city": "Rajshahi",
+  "lat": 24.397974,
+  "lon": 88.560053
+ },
+ "CUS-RAN-01": {
+  "city": "Rangpur",
+  "lat": 25.726799,
+  "lon": 89.322185
+ },
+ "CUS-RAN-02": {
+  "city": "Rangpur",
+  "lat": 25.697875,
+  "lon": 89.294737
+ },
+ "CUS-RAN-03": {
+  "city": "Rangpur",
+  "lat": 25.698223,
+  "lon": 89.254863
+ },
+ "CUS-RAN-04": {
+  "city": "Rangpur",
+  "lat": 25.727622,
+  "lon": 89.227924
+ },
+ "CUS-RAN-05": {
+  "city": "Rangpur",
+  "lat": 25.767374,
+  "lon": 89.231053
+ },
+ "CUS-SYL-01": {
+  "city": "Sylhet",
+  "lat": 24.877799,
+  "lon": 91.915685
+ },
+ "CUS-SYL-02": {
+  "city": "Sylhet",
+  "lat": 24.848875,
+  "lon": 91.888237
+ },
+ "CUS-SYL-03": {
+  "city": "Sylhet",
+  "lat": 24.849223,
+  "lon": 91.848363
+ },
+ "CUS-SYL-04": {
+  "city": "Sylhet",
+  "lat": 24.878622,
+  "lon": 91.821424
+ },
+ "CUS-SYL-05": {
+  "city": "Sylhet",
+  "lat": 24.918374,
+  "lon": 91.824553
+ },
+ "DC-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.836015,
+  "lon": 90.397049
+ },
+ "DLV-BAR-01": {
+  "city": "Barishal",
+  "lat": 22.696146,
+  "lon": 90.357323
+ },
+ "DLV-CHA-01": {
+  "city": "Chattogram",
+  "lat": 22.327192,
+  "lon": 91.779025
+ },
+ "DLV-CUM-01": {
+  "city": "Cumilla",
+  "lat": 23.430992,
+  "lon": 91.176725
+ },
+ "DLV-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.780592,
+  "lon": 90.408325
+ },
+ "DLV-GAZ-01": {
+  "city": "Gazipur",
+  "lat": 23.970192,
+  "lon": 90.416125
+ },
+ "DLV-KHU-01": {
+  "city": "Khulna",
+  "lat": 22.815892,
+  "lon": 89.536125
+ },
+ "DLV-MYM-01": {
+  "city": "Mymensingh",
+  "lat": 24.717392,
+  "lon": 90.416125
+ },
+ "DLV-NAR-01": {
+  "city": "Narayanganj",
+  "lat": 23.594092,
+  "lon": 90.495825
+ },
+ "DLV-RAJ-01": {
+  "city": "Rajshahi",
+  "lat": 24.386444,
+  "lon": 88.628176
+ },
+ "DLV-RAN-01": {
+  "city": "Rangpur",
+  "lat": 25.714192,
+  "lon": 89.271025
+ },
+ "DLV-SYL-01": {
+  "city": "Sylhet",
+  "lat": 24.865192,
+  "lon": 91.864525
+ },
+ "HUB-BAR-01": {
+  "city": "Barishal",
+  "lat": 22.702452,
+  "lon": 90.359811
+ },
+ "HUB-CHA-01": {
+  "city": "Chattogram",
+  "lat": 22.333586,
+  "lon": 91.80208
+ },
+ "HUB-CUM-01": {
+  "city": "Cumilla",
+  "lat": 23.437386,
+  "lon": 91.19978
+ },
+ "HUB-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.786986,
+  "lon": 90.43138
+ },
+ "HUB-GAZ-01": {
+  "city": "Gazipur",
+  "lat": 23.976586,
+  "lon": 90.43918
+ },
+ "HUB-KHU-01": {
+  "city": "Khulna",
+  "lat": 22.822286,
+  "lon": 89.55918
+ },
+ "HUB-MYM-01": {
+  "city": "Mymensingh",
+  "lat": 24.723786,
+  "lon": 90.43918
+ },
+ "HUB-NAR-01": {
+  "city": "Narayanganj",
+  "lat": 23.600486,
+  "lon": 90.51888
+ },
+ "HUB-RAJ-01": {
+  "city": "Rajshahi",
+  "lat": 24.376141,
+  "lon": 88.621906
+ },
+ "HUB-RAN-01": {
+  "city": "Rangpur",
+  "lat": 25.720586,
+  "lon": 89.29408
+ },
+ "HUB-SYL-01": {
+  "city": "Sylhet",
+  "lat": 24.871586,
+  "lon": 91.88758
+ },
+ "MCH-BAR-01": {
+  "city": "Barishal",
+  "lat": 22.701,
+  "lon": 90.3535
+ },
+ "MCH-CHA-01": {
+  "city": "Chattogram",
+  "lat": 22.37736,
+  "lon": 91.805141
+ },
+ "MCH-CUM-01": {
+  "city": "Cumilla",
+  "lat": 23.48116,
+  "lon": 91.202841
+ },
+ "MCH-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.83076,
+  "lon": 90.434441
+ },
+ "MCH-GAZ-01": {
+  "city": "Gazipur",
+  "lat": 24.02036,
+  "lon": 90.442241
+ },
+ "MCH-KHU-01": {
+  "city": "Khulna",
+  "lat": 22.832169,
+  "lon": 89.525022
+ },
+ "MCH-MYM-01": {
+  "city": "Mymensingh",
+  "lat": 24.76756,
+  "lon": 90.442241
+ },
+ "MCH-NAR-01": {
+  "city": "Narayanganj",
+  "lat": 23.64426,
+  "lon": 90.521941
+ },
+ "MCH-RAJ-01": {
+  "city": "Rajshahi",
+  "lat": 24.39496,
+  "lon": 88.626141
+ },
+ "MCH-RAN-01": {
+  "city": "Rangpur",
+  "lat": 25.76436,
+  "lon": 89.297141
+ },
+ "MCH-SYL-01": {
+  "city": "Sylhet",
+  "lat": 24.91536,
+  "lon": 91.890641
+ },
+ "PUP-BAR-01": {
+  "city": "Barishal",
+  "lat": 22.706967,
+  "lon": 90.35418
+ },
+ "PUP-CHA-01": {
+  "city": "Chattogram",
+  "lat": 22.354807,
+  "lon": 91.813127
+ },
+ "PUP-CUM-01": {
+  "city": "Cumilla",
+  "lat": 23.458607,
+  "lon": 91.210827
+ },
+ "PUP-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.808207,
+  "lon": 90.442427
+ },
+ "PUP-GAZ-01": {
+  "city": "Gazipur",
+  "lat": 23.997807,
+  "lon": 90.450227
+ },
+ "PUP-KHU-01": {
+  "city": "Khulna",
+  "lat": 22.825952,
+  "lon": 89.52591
+ },
+ "PUP-MYM-01": {
+  "city": "Mymensingh",
+  "lat": 24.729999,
+  "lon": 90.416125
+ },
+ "PUP-NAR-01": {
+  "city": "Narayanganj",
+  "lat": 23.621707,
+  "lon": 90.529927
+ },
+ "PUP-RAJ-01": {
+  "city": "Rajshahi",
+  "lat": 24.372407,
+  "lon": 88.634127
+ },
+ "PUP-RAN-01": {
+  "city": "Rangpur",
+  "lat": 25.741807,
+  "lon": 89.305127
+ },
+ "PUP-SYL-01": {
+  "city": "Sylhet",
+  "lat": 24.892807,
+  "lon": 91.898627
+ },
+ "REG-BAR-01": {
+  "city": "Barishal",
+  "lat": 22.704776,
+  "lon": 90.348446
+ },
+ "REG-CHA-01": {
+  "city": "Chattogram",
+  "lat": 22.339485,
+  "lon": 91.798663
+ },
+ "REG-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.793093,
+  "lon": 90.387925
+ },
+ "REG-KHU-01": {
+  "city": "Khulna",
+  "lat": 22.828393,
+  "lon": 89.515725
+ },
+ "REG-MYM-01": {
+  "city": "Mymensingh",
+  "lat": 24.729893,
+  "lon": 90.395725
+ },
+ "REG-RAJ-01": {
+  "city": "Rajshahi",
+  "lat": 24.384005,
+  "lon": 88.620616
+ },
+ "REG-RAN-01": {
+  "city": "Rangpur",
+  "lat": 25.726693,
+  "lon": 89.250625
+ },
+ "REG-SYL-01": {
+  "city": "Sylhet",
+  "lat": 24.877693,
+  "lon": 91.844125
+ },
+ "SRT-BAR-01": {
+  "city": "Barishal",
+  "lat": 22.696757,
+  "lon": 90.348901
+ },
+ "SRT-CHA-01": {
+  "city": "Chattogram",
+  "lat": 22.344831,
+  "lon": 91.808674
+ },
+ "SRT-DHA-01": {
+  "city": "Dhaka",
+  "lat": 23.816537,
+  "lon": 90.383156
+ },
+ "SRT-KHU-01": {
+  "city": "Khulna",
+  "lat": 22.851837,
+  "lon": 89.510956
+ },
+ "SRT-MYM-01": {
+  "city": "Mymensingh",
+  "lat": 24.753337,
+  "lon": 90.390956
+ },
+ "SRT-RAJ-01": {
+  "city": "Rajshahi",
+  "lat": 24.380737,
+  "lon": 88.574856
+ },
+ "SRT-RAN-01": {
+  "city": "Rangpur",
+  "lat": 25.750137,
+  "lon": 89.245856
+ },
+ "SRT-SYL-01": {
+  "city": "Sylhet",
+  "lat": 24.901137,
+  "lon": 91.839356
+ }
+}

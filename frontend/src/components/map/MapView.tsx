@@ -24,7 +24,10 @@ import { bboxOfPositions, bearingBetween, findRegionAt, inferVehicleLeg, type BB
 import {
   fetchLiveRoute,
   matchRoad,
+  measure,
+  pointAlong,
   projectOnRoad,
+  roadSegment,
   remainingKm as roadRemainingKm,
   splitRoad,
   useRoads,
@@ -49,7 +52,18 @@ const REGION_FIT_DURATION_MS = 1500;
 const REGION_MAX_ZOOM = 10.5;
 const HOME_DURATION_MS = 1600;
 const FIT_PADDING = { top: 84, bottom: 56, left: 48, right: 64 };
-const VEHICLE_TICK_MS = 2900;
+// A marker should still be moving when its next position arrives. The backend
+// ticks every 3 s, but delivery jitters, so a fixed glide either finishes early
+// and leaves the marker frozen — which reads as a stall, then a jump — or gets
+// cut short. The interval is measured from the feed instead, smoothed, and
+// stretched slightly so a late packet does not strand the marker.
+const DEFAULT_GLIDE_MS = 3200;
+const MIN_GLIDE_MS = 900;
+const MAX_GLIDE_MS = 12000;
+const GLIDE_SLACK = 1.2;
+const INTERVAL_SMOOTHING = 0.3;
+//: How long after a user gesture the follow camera stays out of the way.
+const USER_CAMERA_GRACE_MS = 4000;
 const TRAIL_LENGTH = 40;
 
 /** Map paint colours, read out of the stylesheet so the map follows the theme.
@@ -195,12 +209,32 @@ function buildVehicleArrowIcon(P: MapPalette): ImageData {
 interface VehicleAnim {
   from: LatLon;
   to: LatLon;
+  /** The road actually driven between the two reports, when it is known.
+   *  Interpolating along this instead of straight from `from` to `to` is what
+   *  keeps a marker on the tarmac once you zoom in. */
+  path: [number, number][] | null;
+  cum: number[] | null;
   bearing: number;
   startedAt: number;
+  /** How long this particular glide should take, from the measured feed rate. */
+  glideMs: number;
   timestamp: string;
   regNumber: string;
   status: string;
   speed: number;
+}
+
+interface RiderAnim {
+  from: LatLon;
+  to: LatLon;
+  path: [number, number][] | null;
+  cum: number[] | null;
+  startedAt: number;
+  glideMs: number;
+  timestamp: string;
+  name: string;
+  status: string;
+  phase: string | null;
 }
 
 interface Tooltip {
@@ -260,6 +294,15 @@ export function MapView({ className }: { className?: string }) {
   const routesRef = useRef<LogisticsRoute[]>([]);
   const vehicleAnimRef = useRef<Map<string, VehicleAnim>>(new Map());
   const trailsRef = useRef<Map<string, [number, number][]>>(new Map());
+  const riderAnimRef = useRef<Map<string, RiderAnim>>(new Map());
+  /** Snapshot rider features; live positions are merged over these each frame
+   *  so a rider who is not currently on a job stays on the map. */
+  const riderFeaturesRef = useRef<GeoJSON.Feature[]>([]);
+  /** Smoothed spacing between live updates, and when each feed last spoke. */
+  const feedIntervalRef = useRef<{ vehicles: number; riders: number }>({ vehicles: DEFAULT_GLIDE_MS, riders: DEFAULT_GLIDE_MS });
+  const feedLastAtRef = useRef<{ vehicles: number; riders: number }>({ vehicles: 0, riders: 0 });
+  /** While the user is panning or zooming, the follow camera keeps its hands off. */
+  const userCameraUntilRef = useRef(0);
   const hoveredRef = useRef<{ source: string; id: string } | null>(null);
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectedRegionIdRef = useRef<string | null>(null);
@@ -295,6 +338,7 @@ export function MapView({ className }: { className?: string }) {
   const setFollowVehicle = useControlTowerStore((s) => s.setFollowVehicle);
   const clearSelection = useControlTowerStore((s) => s.clearSelection);
   const vehicles = useControlTowerStore((s) => s.vehicles);
+  const liveRiders = useControlTowerStore((s) => s.riders);
   const roads = useRoads();
 
   const theme = useTheme();
@@ -361,6 +405,52 @@ export function MapView({ className }: { className?: string }) {
     for (const id of ["region-focus-fill", "region-focus-line"]) {
       if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", s.layers.boundaries ? focusVisibility : "none");
     }
+  };
+
+  /**
+   * How long the next glide should last for this feed: the observed gap
+   * between updates, smoothed, plus slack. Called once per batch of updates.
+   */
+  const glideMsFor = (feed: "vehicles" | "riders", now: number) => {
+    const last = feedLastAtRef.current[feed];
+    if (last > 0) {
+      const gap = now - last;
+      // Ignore absurd gaps: a backgrounded tab or a reconnect is not the rate.
+      if (gap > 200 && gap < 30000) {
+        const prev = feedIntervalRef.current[feed];
+        feedIntervalRef.current[feed] = prev + (gap - prev) * INTERVAL_SMOOTHING;
+      }
+    }
+    feedLastAtRef.current[feed] = now;
+    return Math.min(MAX_GLIDE_MS, Math.max(MIN_GLIDE_MS, feedIntervalRef.current[feed] * GLIDE_SLACK));
+  };
+
+  /**
+   * The road between two consecutive position reports, when both ends of the
+   * leg are known and both reports sit on the same road. Null means glide
+   * straight, which is right for a short hop and unavoidable without geometry.
+   */
+  const pathBetween = (
+    from: LatLon,
+    to: LatLon,
+    sourceNodeId: string | null | undefined,
+    destNodeId: string | null | undefined,
+  ): { path: [number, number][]; cum: number[] } | null => {
+    const roadNetwork = roadsRef.current;
+    if (!roadNetwork || !sourceNodeId || !destNodeId) return null;
+    const source = nodesByIdRef.current.get(sourceNodeId);
+    const dest = nodesByIdRef.current.get(destNodeId);
+    if (!source || !dest) return null;
+    const variants = roadNetwork.variants(
+      { lat: source.latitude, lon: source.longitude },
+      { lat: dest.latitude, lon: dest.longitude },
+    );
+    const a = matchRoad(variants, from.lon, from.lat);
+    const b = matchRoad(variants, to.lon, to.lat);
+    if (!a || !b || a.variant !== b.variant || a.offsetM > OFF_ROUTE_M || b.offsetM > OFF_ROUTE_M) return null;
+    const path = roadSegment(a.variant, a.progress, b.progress);
+    if (path.length < 2) return null;
+    return { path, cum: measure(path) };
   };
 
   const recomputeLeg = () => {
@@ -657,6 +747,12 @@ export function MapView({ className }: { className?: string }) {
           revealIfReady(map);
         });
       }
+      // A move with an originalEvent came from the user's hand, not from us.
+      const noteUserCamera = (e: { originalEvent?: unknown }) => {
+        if (e.originalEvent) userCameraUntilRef.current = performance.now() + USER_CAMERA_GRACE_MS;
+      };
+      map.on("movestart", noteUserCamera);
+      map.on("zoomstart", noteUserCamera);
       map.on("moveend", () => {
         const c = map.getCenter();
         lastCamera = { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
@@ -665,7 +761,20 @@ export function MapView({ className }: { className?: string }) {
 
       const initialVehicles = useControlTowerStore.getState().vehicles;
       for (const v of initialVehicles.values()) {
-        vehicleAnimRef.current.set(v.vehicle_id, { from: { lat: v.latitude, lon: v.longitude }, to: { lat: v.latitude, lon: v.longitude }, bearing: v.heading, startedAt: performance.now(), timestamp: v.timestamp, regNumber: v.registration_number, status: v.status, speed: v.speed });
+        // Seeded stationary: the first live update gives them a real glide.
+        vehicleAnimRef.current.set(v.vehicle_id, {
+          from: { lat: v.latitude, lon: v.longitude },
+          to: { lat: v.latitude, lon: v.longitude },
+          path: null,
+          cum: null,
+          bearing: v.heading,
+          startedAt: performance.now(),
+          glideMs: DEFAULT_GLIDE_MS,
+          timestamp: v.timestamp,
+          regNumber: v.registration_number,
+          status: v.status,
+          speed: v.speed,
+        });
       }
       // Sources are filled by the data effect; poke it now that the map exists.
       setMapReadyTick((t) => t + 1);
@@ -700,13 +809,10 @@ export function MapView({ className }: { className?: string }) {
     const risk = riskByNode(derived);
     (map.getSource("nodes") as GeoJSONSource).setData(nodesToGeoJSON(nodes, risk));
     (map.getSource("routes") as GeoJSONSource).setData(routesToGeoJSON(derived.routes, derived.nodesById, roadsRef.current));
-    (map.getSource("riders") as GeoJSONSource).setData(
-      fc(
-        derived.riders
-          .filter((r) => r.hasLocation)
-          .map((r) => pointFeature(r.rider.current_longitude!, r.rider.current_latitude!, { id: r.id, name: r.name, status: r.rider.status, active: r.active.length, city: r.city ?? "" })),
-      ),
-    );
+    riderFeaturesRef.current = derived.riders
+      .filter((r) => r.hasLocation)
+      .map((r) => pointFeature(r.rider.current_longitude!, r.rider.current_latitude!, { id: r.id, name: r.name, status: r.rider.status, active: r.active.length, city: r.city ?? "" }));
+    (map.getSource("riders") as GeoJSONSource).setData(fc(riderFeaturesRef.current));
     (map.getSource("heat") as GeoJSONSource).setData(
       fc(
         derived.shipments
@@ -765,6 +871,7 @@ export function MapView({ className }: { className?: string }) {
     const trails = trailsRef.current;
     const map = mapRef.current;
     const selId = selectedVehicleIdRef.current;
+    const glideMs = glideMsFor("vehicles", now);
     for (const [id, update] of vehicles) {
       const prev = anims.get(id);
       if (prev && prev.timestamp === update.timestamp) continue;
@@ -772,11 +879,29 @@ export function MapView({ className }: { className?: string }) {
       let from = to;
       let bearing = update.heading;
       if (prev) {
-        const t = Math.min(1, (now - prev.startedAt) / VEHICLE_TICK_MS);
-        from = { lat: prev.from.lat + (prev.to.lat - prev.from.lat) * t, lon: prev.from.lon + (prev.to.lon - prev.from.lon) * t };
+        // Start from wherever the marker currently is, not from the last
+        // reported point, so an early update does not snap it backwards.
+        const t = Math.min(1, (now - prev.startedAt) / prev.glideMs);
+        const here = prev.path && prev.cum ? pointAlong(prev.path, prev.cum, t) : null;
+        from = here
+          ? { lat: here[1], lon: here[0] }
+          : { lat: prev.from.lat + (prev.to.lat - prev.from.lat) * t, lon: prev.from.lon + (prev.to.lon - prev.from.lon) * t };
         if (from.lat !== to.lat || from.lon !== to.lon) bearing = bearingBetween(from, to);
       }
-      anims.set(id, { from, to, bearing, startedAt: now, timestamp: update.timestamp, regNumber: update.registration_number, status: update.status, speed: update.speed });
+      const road = pathBetween(from, to, update.current_node_id, update.destination_node_id);
+      anims.set(id, {
+        from,
+        to,
+        path: road?.path ?? null,
+        cum: road?.cum ?? null,
+        bearing,
+        startedAt: now,
+        glideMs,
+        timestamp: update.timestamp,
+        regNumber: update.registration_number,
+        status: update.status,
+        speed: update.speed,
+      });
       const trail = trails.get(id) ?? [];
       const last = trail[trail.length - 1];
       if (!last || last[0] !== to.lon || last[1] !== to.lat) {
@@ -784,8 +909,17 @@ export function MapView({ className }: { className?: string }) {
         if (trail.length > TRAIL_LENGTH) trail.shift();
         trails.set(id, trail);
       }
-      if (map && id === selId && followRef.current && mapReadyRef.current && now > flightUntilRef.current) {
-        map.easeTo({ center: [to.lon, to.lat], duration: VEHICLE_TICK_MS, easing: (t: number) => t, essential: true });
+      // Never pull the camera while the user is working the map: interrupting
+      // their pan or zoom mid-gesture is what made the view snap back.
+      if (
+        map &&
+        id === selId &&
+        followRef.current &&
+        mapReadyRef.current &&
+        now > flightUntilRef.current &&
+        now > userCameraUntilRef.current
+      ) {
+        map.easeTo({ center: [to.lon, to.lat], duration: glideMs, easing: (t: number) => t, essential: true });
       }
     }
     for (const id of anims.keys()) {
@@ -798,6 +932,41 @@ export function MapView({ className }: { className?: string }) {
     // See the note above: recomputeLeg is call-time, not render-time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicles]);
+
+  // Rider glides. Riders work the last mile, so their legs are short and the
+  // road geometry for them comes from the same file the corridors use.
+  useEffect(() => {
+    const now = performance.now();
+    const anims = riderAnimRef.current;
+    const glideMs = glideMsFor("riders", now);
+    for (const [id, update] of liveRiders) {
+      const prev = anims.get(id);
+      if (prev && prev.timestamp === update.timestamp) continue;
+      const to = { lat: update.latitude, lon: update.longitude };
+      let from = to;
+      if (prev) {
+        const t = Math.min(1, (now - prev.startedAt) / prev.glideMs);
+        const here = prev.path && prev.cum ? pointAlong(prev.path, prev.cum, t) : null;
+        from = here
+          ? { lat: here[1], lon: here[0] }
+          : { lat: prev.from.lat + (prev.to.lat - prev.from.lat) * t, lon: prev.from.lon + (prev.to.lon - prev.from.lon) * t };
+      }
+      const road = pathBetween(from, to, update.current_node_id, update.destination_node_id);
+      anims.set(id, {
+        from,
+        to,
+        path: road?.path ?? null,
+        cum: road?.cum ?? null,
+        startedAt: now,
+        glideMs,
+        timestamp: update.timestamp,
+        name: update.name,
+        status: update.status,
+        phase: update.phase ?? null,
+      });
+    }
+    for (const id of anims.keys()) if (!liveRiders.has(id)) anims.delete(id);
+  }, [liveRiders]);
 
   // Package path.
   useEffect(() => {
@@ -879,14 +1048,33 @@ export function MapView({ className }: { className?: string }) {
         let selPos: [number, number] | null = null;
         const features: GeoJSON.Feature[] = [];
         for (const [id, a] of vehicleAnimRef.current) {
-          const t = Math.min(1, (now - a.startedAt) / VEHICLE_TICK_MS);
-          const lat = a.from.lat + (a.to.lat - a.from.lat) * t;
-          const lon = a.from.lon + (a.to.lon - a.from.lon) * t;
+          const t = Math.min(1, (now - a.startedAt) / a.glideMs);
+          const point = a.path && a.cum ? pointAlong(a.path, a.cum, t) : null;
+          const lat = point ? point[1] : a.from.lat + (a.to.lat - a.from.lat) * t;
+          const lon = point ? point[0] : a.from.lon + (a.to.lon - a.from.lon) * t;
           const selected = id === selId;
           if (selected) selPos = [lon, lat];
           features.push({ type: "Feature", id, geometry: { type: "Point", coordinates: [lon, lat] }, properties: { id, selected, dimmed: selId != null && !selected, registration_number: a.regNumber, status: a.status, speed: a.speed, bearing: a.bearing } });
         }
         vehicleSource.setData(fc(features));
+
+        // Riders move on the same clock as vehicles; drawn from the live feed
+        // when there is one, and left on their snapshot position otherwise.
+        const riderSource = map.getSource("riders") as GeoJSONSource | undefined;
+        if (riderSource && riderAnimRef.current.size > 0) {
+          const live = new Map<string, GeoJSON.Feature>();
+          for (const [id, a] of riderAnimRef.current) {
+            const t = Math.min(1, (now - a.startedAt) / a.glideMs);
+            const point = a.path && a.cum ? pointAlong(a.path, a.cum, t) : null;
+            const lat = point ? point[1] : a.from.lat + (a.to.lat - a.from.lat) * t;
+            const lon = point ? point[0] : a.from.lon + (a.to.lon - a.from.lon) * t;
+            const base = riderFeaturesRef.current.find((f) => f.properties?.id === id);
+            live.set(id, pointFeature(lon, lat, { ...(base?.properties ?? { name: a.name, active: 0, city: "" }), id, status: a.status, phase: a.phase }));
+          }
+          const merged = riderFeaturesRef.current.map((f) => live.get(String(f.properties?.id)) ?? f);
+          for (const [id, f] of live) if (!riderFeaturesRef.current.some((b) => b.properties?.id === id)) merged.push(f);
+          riderSource.setData(fc(merged));
+        }
         const trailSource = map.getSource("vehicle-trail") as GeoJSONSource | undefined;
         const legSource = map.getSource("vehicle-leg") as GeoJSONSource | undefined;
         const roadSource = map.getSource("vehicle-road") as GeoJSONSource | undefined;

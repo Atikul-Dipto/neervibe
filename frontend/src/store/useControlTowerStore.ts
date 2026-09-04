@@ -6,6 +6,7 @@ import type {
   LogisticsRoute,
   PackageLiveUpdate,
   PackageTracking,
+  RiderLiveUpdate,
   Vehicle,
   VehicleLiveUpdate,
 } from "@/types/domain";
@@ -69,6 +70,7 @@ interface ControlTowerState {
   selectedRegion: RegionRef | null;
   trackedPackage: PackageTracking | null;
   vehicles: Map<string, VehicleLiveUpdate>;
+  riders: Map<string, RiderLiveUpdate>;
   eventLog: PackageLiveUpdate[];
   /** Static network copy kept for the map (mirrors the data store). */
   nodes: LogisticsNode[];
@@ -86,6 +88,7 @@ interface ControlTowerState {
   clearSelection: () => void;
   setTrackedPackage: (pkg: PackageTracking | null) => void;
   upsertVehicle: (update: VehicleLiveUpdate) => void;
+  upsertRider: (update: RiderLiveUpdate) => void;
   pushEvent: (update: PackageLiveUpdate) => void;
   setNetwork: (nodes: LogisticsNode[], routes: LogisticsRoute[]) => void;
   loadRegions: () => Promise<void>;
@@ -100,6 +103,7 @@ export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
   selectedRegion: null,
   trackedPackage: null,
   vehicles: new Map(),
+  riders: new Map(),
   eventLog: [],
   nodes: [],
   routes: [],
@@ -158,6 +162,13 @@ export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
       const next = new Map(s.vehicles);
       next.set(update.vehicle_id, update);
       return { vehicles: next };
+    }),
+
+  upsertRider: (update) =>
+    set((s) => {
+      const next = new Map(s.riders);
+      next.set(update.rider_id, update);
+      return { riders: next };
     }),
 
   pushEvent: (update) =>

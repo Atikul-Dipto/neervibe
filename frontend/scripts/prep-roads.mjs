@@ -17,6 +17,12 @@
 //   frontend/public/geo/bd/roads.json       (served to the browser)
 //   backend/app/data/road_geometry.json     (read by the simulator)
 //
+// Two kinds of leg are generated:
+//   * line-haul — every edge in the routes table, hub to hub;
+//   * last mile — each city's delivery hub to its customer zones, and its local
+//     hub to the merchant and pickup point. Riders work these, and they are not
+//     in the routes table, so without them a rider would have no road to drive.
+//
 // Routing: OSRM's public demo server over OpenStreetMap data. `alternatives`
 // gives the realistic second-best road, which is what a driver taking "the long
 // way" actually does — the simulator sends a share of trips down it and the map
@@ -95,17 +101,39 @@ async function main() {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   console.log(`${nodes.length} nodes, ${routes.length} routes`);
 
+  // Last-mile pairs: what a rider drives, which the routes table does not model.
+  const byCity = new Map();
+  for (const n of nodes) {
+    if (!byCity.has(n.city)) byCity.set(n.city, []);
+    byCity.get(n.city).push(n);
+  }
+  const lastMile = [];
+  for (const [, group] of byCity) {
+    const pick = (...types) => types.map((t) => group.find((n) => n.node_type === t)).find(Boolean);
+    const deliveryHub = pick("DELIVERY_HUB", "HUB");
+    const localHub = pick("HUB", "DELIVERY_HUB");
+    for (const c of group.filter((n) => n.node_type === "CUSTOMER")) {
+      if (deliveryHub) lastMile.push([deliveryHub, c], [c, deliveryHub]);
+    }
+    for (const t of ["MERCHANT", "PICKUP_POINT"]) {
+      const n = group.find((x) => x.node_type === t);
+      if (localHub && n) lastMile.push([localHub, n], [n, localHub]);
+    }
+  }
+
+  const pairs = [
+    ...routes.map((r) => [byId.get(r.source_node_id), byId.get(r.destination_node_id), "line-haul"]),
+    ...lastMile.map(([a, b]) => [a, b, "last-mile"]),
+  ].filter(([a, b]) => a && b);
+
   const edges = {};
   let ok = 0, straight = 0, detours = 0;
 
-  for (const [i, r] of routes.entries()) {
-    const a = byId.get(r.source_node_id);
-    const b = byId.get(r.destination_node_id);
-    if (!a || !b) continue;
+  for (const [i, [a, b, kind]] of pairs.entries()) {
     const key = edgeKey(a, b);
     if (edges[key]) continue;
 
-    process.stdout.write(`  [${i + 1}/${routes.length}] ${a.city} -> ${b.city} … `);
+    process.stdout.write(`  [${i + 1}/${pairs.length}] ${kind} ${a.city} -> ${b.city} … `);
     let variants = null;
     try {
       variants = await routeBetween(a, b);
@@ -115,12 +143,12 @@ async function main() {
     if (!variants) {
       // Recorded explicitly so consumers can tell "no road found" from
       // "not generated yet" and fall back honestly.
-      edges[key] = { variants: [], note: "no driving route returned" };
+      edges[key] = { variants: [], kind, note: "no driving route returned" };
       straight++;
       await sleep(PAUSE_MS);
       continue;
     }
-    edges[key] = { variants };
+    edges[key] = { variants, kind };
     ok++;
     if (variants.length > 1) detours++;
     console.log(`${variants.length} variant(s), ${variants[0].geometry.length} pts, ${variants[0].distanceKm} km`);
@@ -134,6 +162,7 @@ async function main() {
     attribution: "Routing © OSRM, road data © OpenStreetMap contributors (ODbL)",
     simplifyToleranceDeg: SIMPLIFY_TOLERANCE,
     edgeKeyFormat: "lon,lat>lon,lat, each rounded to 4dp",
+    kinds: "line-haul = a routes-table edge; last-mile = a rider leg between a hub and a doorstep",
     edges,
   };
 
@@ -146,7 +175,9 @@ async function main() {
     fs.writeFileSync(t, JSON.stringify(payload));
     console.log(`wrote ${path.relative(REPO, t)} (${(fs.statSync(t).size / 1024).toFixed(0)} KB)`);
   }
+  const counts = Object.values(edges).reduce((m, e) => ({ ...m, [e.kind]: (m[e.kind] ?? 0) + 1 }), {});
   console.log(`edges routed: ${ok}, with an alternative: ${detours}, unroutable: ${straight}`);
+  console.log(`by kind: ${JSON.stringify(counts)}`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

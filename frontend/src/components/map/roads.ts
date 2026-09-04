@@ -177,6 +177,47 @@ export function splitRoad(variant: RoadVariant, progress: number, at?: [number, 
   return { behind, ahead };
 }
 
+/** The stretch of road between two progress fractions, endpoints included.
+ *
+ * This is what a vehicle actually drove between two position reports. Gliding
+ * a marker straight from one report to the next cuts every corner, which is
+ * invisible at country zoom and glaring at street zoom. */
+export function roadSegment(variant: RoadVariant, fromProgress: number, toProgress: number): [number, number][] {
+  const a = Math.min(1, Math.max(0, Math.min(fromProgress, toProgress))) * variant.lengthM;
+  const b = Math.min(1, Math.max(0, Math.max(fromProgress, toProgress))) * variant.lengthM;
+  const out: [number, number][] = [pointAtDistance(variant.geometry, variant.cumulative, a)];
+  for (let i = 0; i < variant.geometry.length; i++) {
+    if (variant.cumulative[i] > a && variant.cumulative[i] < b) out.push(variant.geometry[i]);
+  }
+  out.push(pointAtDistance(variant.geometry, variant.cumulative, b));
+  return out;
+}
+
+/** Cumulative metres along a polyline, one entry per point. */
+export function measure(points: [number, number][]): number[] {
+  const cum = [0];
+  for (let i = 1; i < points.length; i++) cum.push(cum[i - 1] + metresBetween(points[i - 1], points[i]));
+  return cum;
+}
+
+function pointAtDistance(points: [number, number][], cum: number[], target: number): [number, number] {
+  if (points.length === 0) return [0, 0];
+  let i = 1;
+  while (i < cum.length - 1 && cum[i] < target) i++;
+  const span = cum[i] - cum[i - 1];
+  const t = span <= 0 ? 0 : (target - cum[i - 1]) / span;
+  const [lon1, lat1] = points[i - 1];
+  const [lon2, lat2] = points[i];
+  return [lon1 + (lon2 - lon1) * t, lat1 + (lat2 - lat1) * t];
+}
+
+/** A point `t` of the way (0..1 by length) along a polyline. */
+export function pointAlong(points: [number, number][], cum: number[], t: number): [number, number] {
+  const total = cum[cum.length - 1] ?? 0;
+  if (points.length < 2 || total <= 0) return points[0] ?? [0, 0];
+  return pointAtDistance(points, cum, total * Math.min(1, Math.max(0, t)));
+}
+
 /** Remaining road distance in km from a progress fraction. */
 export function remainingKm(variant: RoadVariant, progress: number): number {
   return (variant.lengthM * (1 - Math.min(1, Math.max(0, progress)))) / 1000;

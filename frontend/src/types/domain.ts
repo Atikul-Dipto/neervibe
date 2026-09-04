@@ -232,6 +232,23 @@ export interface VehicleLiveUpdate {
   timestamp: string;
 }
 
+export interface RiderLiveUpdate {
+  rider_id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  status: RiderStatus;
+  current_node_id?: string | null;
+  /** Where this leg ends: the doorstep on the way out, the hub on the way back. */
+  destination_node_id?: string | null;
+  package_id?: string | null;
+  /** "outbound" = hub to doorstep, "return" = doorstep to hub, null = idle. */
+  phase?: "outbound" | "return" | null;
+  road_variant?: string | null;
+  road_progress?: number | null;
+  timestamp: string;
+}
+
 export interface PackageLiveUpdate {
   package_id: string;
   tracking_number: string;

@@ -5,7 +5,7 @@ share one upstream subscription per channel.
 """
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from app.core.ws_channels import NETWORK, NODES, PACKAGES, ROUTES, VEHICLES
+from app.core.ws_channels import NETWORK, NODES, PACKAGES, RIDERS, ROUTES, VEHICLES
 from app.websockets.manager import manager
 
 router = APIRouter()
@@ -29,6 +29,11 @@ async def ws_network(websocket: WebSocket) -> None:
 @router.websocket("/ws/live/vehicles")
 async def ws_vehicles(websocket: WebSocket) -> None:
     await _handle(VEHICLES, websocket)
+
+
+@router.websocket("/ws/live/riders")
+async def ws_riders(websocket: WebSocket) -> None:
+    await _handle(RIDERS, websocket)
 
 
 @router.websocket("/ws/live/packages")

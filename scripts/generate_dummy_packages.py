@@ -89,10 +89,15 @@ async def ensure_parties(session: AsyncSession, n_customers: int, n_merchants: i
     await session.commit()
 
 
-async def generate(count: int) -> None:
+async def generate(count: int, city: str | None = None) -> None:
+    """Create `count` packages. With `city`, every parcel starts or ends there
+    — used to give a newly added division real traffic without inflating the
+    rest of the network."""
     async with AsyncSessionLocal() as session:
         existing = await session.execute(select(func.count()).select_from(Package))
-        if existing.scalar_one() >= count:
+        # The "already has enough" guard is about topping the network up to a
+        # size; a city-scoped run is a deliberate addition, so it does not apply.
+        if city is None and existing.scalar_one() >= count:
             print(f"Database already has >= {count} packages. Skipping.")
             return
 
@@ -110,6 +115,15 @@ async def generate(count: int) -> None:
             .scalars()
             .all()
         )
+
+        if city is not None:
+            # One end of the parcel is in the new city; the other is anywhere,
+            # so the city gets both inbound line-haul and local delivery work.
+            city_sources = [n for n in source_nodes if n.city == city]
+            city_dests = [n for n in dest_nodes if n.city == city]
+            if not city_sources and not city_dests:
+                print(f"No merchant or customer nodes in {city}.")
+                return
 
         if not customers or not merchants or not source_nodes or not dest_nodes:
             print("Run scripts/seed_database.py first — logistics network is empty.")
@@ -151,8 +165,18 @@ async def generate(count: int) -> None:
             if status == PackageStatus.DELIVERED:
                 actual_delivery_at = created_at + timedelta(hours=random.uniform(2, sla_hours * 1.3))
 
-            source_node = random.choice(source_nodes)
-            dest_node = random.choice(dest_nodes)
+            if city is None:
+                source_node = random.choice(source_nodes)
+                dest_node = random.choice(dest_nodes)
+            elif i % 2 == 0 and city_dests:
+                source_node = random.choice(source_nodes)
+                dest_node = random.choice(city_dests)
+            elif city_sources:
+                source_node = random.choice(city_sources)
+                dest_node = random.choice(dest_nodes)
+            else:
+                source_node = random.choice(source_nodes)
+                dest_node = random.choice(city_dests)
             current_node = locate_package(status, source_node, dest_node, graph)
 
             package = Package(
@@ -193,8 +217,9 @@ async def generate(count: int) -> None:
 async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, default=100)
+    parser.add_argument("--city", help="confine every parcel to this city at one end")
     args = parser.parse_args()
-    await generate(args.count)
+    await generate(args.count, args.city)
     await engine.dispose()
 
 

@@ -6,8 +6,9 @@ architecture's modularity rule.
 """
 NETWORK = "live:network"
 VEHICLES = "live:vehicles"
+RIDERS = "live:riders"
 PACKAGES = "live:packages"
 ROUTES = "live:routes"
 NODES = "live:nodes"
 
-ALL_CHANNELS = [NETWORK, VEHICLES, PACKAGES, ROUTES, NODES]
+ALL_CHANNELS = [NETWORK, VEHICLES, RIDERS, PACKAGES, ROUTES, NODES]

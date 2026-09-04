@@ -4,6 +4,7 @@ never drift.
 """
 NETWORK = "live:network"
 VEHICLES = "live:vehicles"
+RIDERS = "live:riders"
 PACKAGES = "live:packages"
 ROUTES = "live:routes"
 NODES = "live:nodes"
