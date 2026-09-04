@@ -1,12 +1,13 @@
 "use client";
 
 import clsx from "clsx";
+import { useChartTheme, type ChartColor } from "./chartTheme";
 
 export interface Segment {
   key: string;
   label: string;
   value: number;
-  color: string;
+  color: ChartColor;
 }
 
 /** A single stacked distribution bar with a clickable legend. */
@@ -23,6 +24,7 @@ export function SegmentBar({
   className?: string;
   height?: number;
 }) {
+  const chart = useChartTheme();
   const total = segments.reduce((s, x) => s + x.value, 0);
   const shown = segments.filter((s) => s.value > 0);
   if (total === 0) return <div className="py-4 text-center text-xs text-ink-500">No data for the current filters.</div>;
@@ -35,7 +37,7 @@ export function SegmentBar({
             onClick={onClick ? () => onClick(s.key) : undefined}
             title={`${s.label}: ${s.value.toLocaleString()} (${Math.round((s.value / total) * 100)}%)`}
             className={clsx("transition-opacity", onClick && "cursor-pointer hover:opacity-80", activeKey && activeKey !== s.key && "opacity-35")}
-            style={{ width: `${(s.value / total) * 100}%`, backgroundColor: s.color }}
+            style={{ width: `${(s.value / total) * 100}%`, backgroundColor: chart.color(s.color) }}
             aria-label={s.label}
           />
         ))}
@@ -52,7 +54,7 @@ export function SegmentBar({
             )}
             aria-pressed={activeKey === s.key}
           >
-            <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: s.color }} />
+            <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: chart.color(s.color) }} />
             {s.label}
             <span className="tabular-nums text-ink-900">{s.value.toLocaleString()}</span>
             <span className="tabular-nums text-ink-500">{Math.round((s.value / total) * 100)}%</span>

@@ -14,12 +14,12 @@ import {
   YAxis,
 } from "recharts";
 import clsx from "clsx";
-import { CHART } from "./chartTheme";
+import { useChartTheme, type ChartColor } from "./chartTheme";
 
 export interface TrendSeries {
   key: string;
   label: string;
-  color?: string;
+  color?: ChartColor;
   kind?: "area" | "line" | "bar";
   stackId?: string;
   dashed?: boolean;
@@ -52,6 +52,7 @@ export function TrendChart({
   legend?: boolean;
   syncId?: string;
 }) {
+  const CHART = useChartTheme();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const visible = series.filter((s) => !hidden.has(s.key));
   const hasRight = series.some((s) => s.yAxisId === "right");
@@ -71,7 +72,7 @@ export function TrendChart({
         >
           <defs>
             {series.map((s, i) => {
-              const color = s.color ?? CHART.series[i % CHART.series.length];
+              const color = s.color ? CHART.color(s.color) : CHART.series[i % CHART.series.length];
               return (
                 <linearGradient key={s.key} id={`grad-${s.key}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={color} stopOpacity={0.35} />
@@ -92,18 +93,18 @@ export function TrendChart({
           <YAxis yAxisId="left" tick={{ fill: CHART.axis, fontSize: 10 }} tickLine={false} axisLine={false} width={40} tickFormatter={(v) => yFormatter(Number(v))} />
           {hasRight && <YAxis yAxisId="right" orientation="right" tick={{ fill: CHART.axis, fontSize: 10 }} tickLine={false} axisLine={false} width={36} />}
           <Tooltip
-            cursor={{ fill: CHART.cursor, stroke: "#2a3644" }}
+            cursor={{ fill: CHART.cursor, stroke: CHART.grid }}
             contentStyle={CHART.tooltip}
-            labelStyle={{ color: "#a3b1c0", marginBottom: 4 }}
+            labelStyle={{ color: CHART.axis, marginBottom: 4 }}
             itemStyle={{ padding: 0 }}
             formatter={(value, name) => [typeof value === "number" ? yFormatter(value) : String(value), String(name)]}
             labelFormatter={(l) => (xFormatter ? xFormatter(String(l)) : String(l))}
           />
-          {referenceX && <ReferenceLine x={referenceX} yAxisId="left" stroke="#7c8a99" strokeDasharray="3 3" />}
-          {activeX && <ReferenceLine x={activeX} yAxisId="left" stroke="#22d3ee" strokeWidth={2} />}
+          {referenceX && <ReferenceLine x={referenceX} yAxisId="left" stroke={CHART.axis} strokeDasharray="3 3" />}
+          {activeX && <ReferenceLine x={activeX} yAxisId="left" stroke={CHART.series[0]} strokeWidth={2} />}
           {visible.map((s, idx) => {
             const i = series.indexOf(s);
-            const color = s.color ?? CHART.series[i % CHART.series.length];
+            const color = s.color ? CHART.color(s.color) : CHART.series[i % CHART.series.length];
             const common = { dataKey: s.key, name: s.label, yAxisId: s.yAxisId ?? "left", isAnimationActive: false as const };
             if (s.kind === "bar") return <Bar key={s.key} {...common} fill={color} stackId={s.stackId} radius={idx === visible.length - 1 ? [3, 3, 0, 0] : 0} maxBarSize={28} />;
             if (s.kind === "line") return <Line key={s.key} {...common} type="monotone" stroke={color} strokeWidth={2} dot={false} strokeDasharray={s.dashed ? "4 3" : undefined} />;
@@ -114,7 +115,7 @@ export function TrendChart({
       {legend && series.length > 1 && (
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 px-1">
           {series.map((s, i) => {
-            const color = s.color ?? CHART.series[i % CHART.series.length];
+            const color = s.color ? CHART.color(s.color) : CHART.series[i % CHART.series.length];
             const off = hidden.has(s.key);
             return (
               <button

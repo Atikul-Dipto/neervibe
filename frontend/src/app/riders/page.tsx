@@ -72,10 +72,10 @@ function Riders() {
         <div className="space-y-3">
           <RiderUtilizationCard riders={riders} />
           <ChartCard title="Top performers" subtitle="By performance score" empty={scored.length === 0}>
-            <BarList rows={[...scored].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8).map((r) => ({ key: r.id, label: r.name, value: r.score ?? 0, secondary: r.city ?? undefined, color: "#34d399" }))} max={100} onClick={(k) => open("rider", k)} />
+            <BarList rows={[...scored].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 8).map((r) => ({ key: r.id, label: r.name, value: r.score ?? 0, secondary: r.city ?? undefined, color: "good" }))} max={100} onClick={(k) => open("rider", k)} />
           </ChartCard>
           <ChartCard title="Needs attention" subtitle="Lowest scores with enough history" empty={scored.filter((r) => r.attempts.length >= 5).length === 0}>
-            <BarList rows={[...scored].filter((r) => r.attempts.length >= 5).sort((a, b) => (a.score ?? 0) - (b.score ?? 0)).slice(0, 5).map((r) => ({ key: r.id, label: r.name, value: r.score ?? 0, secondary: `${r.failedAttempts} failed`, color: "#f87171" }))} max={100} onClick={(k) => open("rider", k)} />
+            <BarList rows={[...scored].filter((r) => r.attempts.length >= 5).sort((a, b) => (a.score ?? 0) - (b.score ?? 0)).slice(0, 5).map((r) => ({ key: r.id, label: r.name, value: r.score ?? 0, secondary: `${r.failedAttempts} failed`, color: "danger" }))} max={100} onClick={(k) => open("rider", k)} />
           </ChartCard>
         </div>
       </div>

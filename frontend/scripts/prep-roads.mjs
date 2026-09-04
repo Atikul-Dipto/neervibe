@@ -1,0 +1,152 @@
+// Builds the road geometry every vehicle and corridor is drawn along.
+//
+// WHY THIS EXISTS
+// Vehicles used to be interpolated on a straight line between two nodes, which
+// put them through the Meghna, the Padma and the Bay of Bengal, and made every
+// corridor on the map a chord rather than a road. This script asks a real
+// routing engine for the driving path between each pair of connected nodes
+// once, and both the simulator and the map then follow that path.
+//
+// Nothing queries a routing service at request time because of this file: it is
+// generated, committed, and read from disk. Re-run it when the network's nodes
+// or routes change.
+//
+//   node scripts/prep-roads.mjs [apiBase]
+//
+// Default apiBase is the live backend. Writes:
+//   frontend/public/geo/bd/roads.json       (served to the browser)
+//   backend/app/data/road_geometry.json     (read by the simulator)
+//
+// Routing: OSRM's public demo server over OpenStreetMap data. `alternatives`
+// gives the realistic second-best road, which is what a driver taking "the long
+// way" actually does — the simulator sends a share of trips down it and the map
+// matches the vehicle back to whichever one it is on.
+
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const FRONTEND = path.resolve(HERE, "..");
+const REPO = path.resolve(FRONTEND, "..");
+
+const API = process.argv[2] ?? "https://neervibe-backend.onrender.com/api/v1";
+const OSRM = "https://router.project-osrm.org/route/v1/driving";
+const SIMPLIFY_TOLERANCE = 0.0004; // ~45 m — below one map pixel at city zoom
+const MAX_VARIANTS = 2;
+const PAUSE_MS = 400; // the demo server is a shared courtesy resource
+
+const round = (n, dp = 5) => Number(n.toFixed(dp));
+/** Stable across reseeds: node UUIDs change, coordinates do not. */
+export const edgeKey = (a, b) =>
+  `${round(a.longitude, 4)},${round(a.latitude, 4)}>${round(b.longitude, 4)},${round(b.latitude, 4)}`;
+
+// --- Douglas-Peucker --------------------------------------------------------
+function perpDistance(p, a, b) {
+  const [px, py] = p, [ax, ay] = a, [bx, by] = b;
+  const dx = bx - ax, dy = by - ay;
+  if (dx === 0 && dy === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function simplify(points, tolerance) {
+  if (points.length < 3) return points;
+  let maxDist = 0, index = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpDistance(points[i], points[0], points[points.length - 1]);
+    if (d > maxDist) { maxDist = d; index = i; }
+  }
+  if (maxDist <= tolerance) return [points[0], points[points.length - 1]];
+  return [
+    ...simplify(points.slice(0, index + 1), tolerance).slice(0, -1),
+    ...simplify(points.slice(index), tolerance),
+  ];
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function getJson(url) {
+  const res = await fetch(url, { headers: { accept: "application/json" } });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
+  return res.json();
+}
+
+async function routeBetween(a, b) {
+  const url =
+    `${OSRM}/${a.longitude},${a.latitude};${b.longitude},${b.latitude}` +
+    `?overview=full&geometries=geojson&alternatives=true`;
+  const data = await getJson(url);
+  if (data.code !== "Ok" || !data.routes?.length) return null;
+  return data.routes.slice(0, MAX_VARIANTS).map((r, i) => ({
+    name: i === 0 ? "primary" : `alt-${i}`,
+    distanceKm: round(r.distance / 1000, 2),
+    durationMin: round(r.duration / 60, 1),
+    geometry: simplify(r.geometry.coordinates, SIMPLIFY_TOLERANCE).map(([lon, lat]) => [round(lon), round(lat)]),
+  }));
+}
+
+async function main() {
+  console.log(`network from ${API}`);
+  const [nodes, routes] = await Promise.all([
+    getJson(`${API}/nodes?limit=1000`),
+    getJson(`${API}/routes?limit=1000`),
+  ]);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  console.log(`${nodes.length} nodes, ${routes.length} routes`);
+
+  const edges = {};
+  let ok = 0, straight = 0, detours = 0;
+
+  for (const [i, r] of routes.entries()) {
+    const a = byId.get(r.source_node_id);
+    const b = byId.get(r.destination_node_id);
+    if (!a || !b) continue;
+    const key = edgeKey(a, b);
+    if (edges[key]) continue;
+
+    process.stdout.write(`  [${i + 1}/${routes.length}] ${a.city} -> ${b.city} … `);
+    let variants = null;
+    try {
+      variants = await routeBetween(a, b);
+    } catch (err) {
+      console.log(`failed (${err.message})`);
+    }
+    if (!variants) {
+      // Recorded explicitly so consumers can tell "no road found" from
+      // "not generated yet" and fall back honestly.
+      edges[key] = { variants: [], note: "no driving route returned" };
+      straight++;
+      await sleep(PAUSE_MS);
+      continue;
+    }
+    edges[key] = { variants };
+    ok++;
+    if (variants.length > 1) detours++;
+    console.log(`${variants.length} variant(s), ${variants[0].geometry.length} pts, ${variants[0].distanceKm} km`);
+    await sleep(PAUSE_MS);
+  }
+
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    profile: "driving",
+    source: "OSRM demo server (router.project-osrm.org) over OpenStreetMap data",
+    attribution: "Routing © OSRM, road data © OpenStreetMap contributors (ODbL)",
+    simplifyToleranceDeg: SIMPLIFY_TOLERANCE,
+    edgeKeyFormat: "lon,lat>lon,lat, each rounded to 4dp",
+    edges,
+  };
+
+  const targets = [
+    path.join(FRONTEND, "public", "geo", "bd", "roads.json"),
+    path.join(REPO, "backend", "app", "data", "road_geometry.json"),
+  ];
+  for (const t of targets) {
+    fs.mkdirSync(path.dirname(t), { recursive: true });
+    fs.writeFileSync(t, JSON.stringify(payload));
+    console.log(`wrote ${path.relative(REPO, t)} (${(fs.statSync(t).size / 1024).toFixed(0)} KB)`);
+  }
+  console.log(`edges routed: ${ok}, with an alternative: ${detours}, unroutable: ${straight}`);
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });

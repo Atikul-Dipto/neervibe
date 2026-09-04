@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Menu, RefreshCw, ShieldCheck, Wifi, WifiOff } from "lucide-react";
+import { Bell, Menu, Moon, RefreshCw, ShieldCheck, Sun, Wifi, WifiOff } from "lucide-react";
 import clsx from "clsx";
 import { navItemFor } from "@/config/navigation";
 import { ROLE_BY_KEY } from "@/config/roles";
@@ -11,6 +11,7 @@ import { api } from "@/services/api";
 import { useDerived, useDataStatus } from "@/data/provider";
 import { useOpsStore } from "@/data/ops";
 import { useSystemStore } from "@/data/system";
+import { toggleTheme, useTheme } from "@/data/theme";
 import { useDrawerStore } from "@/data/drawer";
 import { formatRelative } from "@/data/format";
 import { Popover } from "@/components/ui/primitives";
@@ -24,7 +25,7 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
   const pathname = usePathname();
   const item = navItemFor(pathname);
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-nv-800 bg-nv-950/90 px-3 backdrop-blur md:px-4">
+    <header className="layer-topbar relative flex h-12 shrink-0 items-center gap-3 border-b border-nv-800 bg-nv-950/90 px-3 backdrop-blur md:px-4">
       <button onClick={onMenu} className="rounded p-1.5 text-ink-500 hover:bg-nv-850 hover:text-ink-900 md:hidden" aria-label="Open navigation">
         <Menu className="h-4 w-4" />
       </button>
@@ -38,10 +39,26 @@ export function TopBar({ onMenu }: { onMenu: () => void }) {
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <SystemStatus />
+        <ThemeToggle />
         <Notifications />
         <RoleMenu />
       </div>
     </header>
+  );
+}
+
+function ThemeToggle() {
+  const theme = useTheme();
+  const next = theme === "dark" ? "light" : "dark";
+  return (
+    <button
+      onClick={toggleTheme}
+      className="rounded-md p-1.5 text-ink-600 hover:bg-nv-850 hover:text-ink-900"
+      title={`Switch to ${next} theme`}
+      aria-label={`Switch to ${next} theme`}
+    >
+      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
   );
 }
 

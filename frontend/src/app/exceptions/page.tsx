@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { ChartCard } from "@/components/charts/ChartCard";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { BarList } from "@/components/charts/BarList";
-import { PRIORITY_COLORS } from "@/components/charts/chartTheme";
+import { useChartTheme } from "@/components/charts/chartTheme";
 import { EXCEPTION_STATUS_TONE } from "@/components/drawer/ExceptionDetail";
 import { EXCEPTION_TYPE_LABELS, type ExceptionItem, type ExceptionPriority, type ExceptionType } from "@/data/derive";
 import { useOpsStore, type ExceptionStatus } from "@/data/ops";
@@ -35,6 +35,7 @@ export default function ExceptionsPage() {
 const PRIORITIES: ExceptionPriority[] = ["critical", "high", "medium", "low"];
 
 function Exceptions() {
+  const chart = useChartTheme();
   const { derived, filters, cross } = usePageData();
   const params = useSearchParams();
   const open = useOpenDrawer();
@@ -81,7 +82,7 @@ function Exceptions() {
   const byType = useMemo(() => {
     const m = new Map<ExceptionType, number>();
     for (const e of scoped) if (!["resolved", "snoozed"].includes(statusOf(e))) m.set(e.type, (m.get(e.type) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => ({ key: t, label: EXCEPTION_TYPE_LABELS[t], value: n, color: "#fbbf24" }));
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([t, n]) => ({ key: t, label: EXCEPTION_TYPE_LABELS[t], value: n, color: "warning" }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scoped, workflow]);
 
@@ -140,7 +141,7 @@ function Exceptions() {
             exportName="exceptions"
             emptyWhat="exceptions"
             onClearFilters={() => { clearAll(); setType("all"); setPriority("all"); setStatus("active"); }}
-            rowClassName={(e) => (e.priority === "critical" ? "shadow-[inset_2px_0_0_0_#f87171]" : undefined)}
+            rowClassName={(e) => (e.priority === "critical" ? "shadow-[inset_2px_0_0_0_var(--tone-bad-400)]" : undefined)}
             bulkActions={(sel) => (
               <>
                 <Button size="xs" variant="secondary" onClick={() => bulk((e) => update(e.id, { status: "assigned", assignee: userName }, "Took ownership of exception", e.entity.label))}>Assign to me</Button>
@@ -153,7 +154,7 @@ function Exceptions() {
         </div>
         <div className="space-y-3">
           <ChartCard title="By priority" subtitle="Active exceptions" empty={scoped.length === 0}>
-            <DonutChart slices={PRIORITIES.map((p) => ({ key: p, label: humanize(p), value: counts(p), color: PRIORITY_COLORS[p] }))} centerValue={String(PRIORITIES.reduce((n, p) => n + counts(p), 0))} centerLabel="active" onClick={(k) => setPriority(priority === k ? "all" : (k as ExceptionPriority))} activeKey={priority === "all" ? null : priority} height={140} />
+            <DonutChart slices={PRIORITIES.map((p) => ({ key: p, label: humanize(p), value: counts(p), color: chart.priority[p] }))} centerValue={String(PRIORITIES.reduce((n, p) => n + counts(p), 0))} centerLabel="active" onClick={(k) => setPriority(priority === k ? "all" : (k as ExceptionPriority))} activeKey={priority === "all" ? null : priority} height={140} />
           </ChartCard>
           <ChartCard title="By type" subtitle="Click to filter" empty={byType.length === 0}>
             <BarList rows={byType} onClick={(k) => setType(type === k ? "all" : (k as ExceptionType))} activeKey={type === "all" ? null : type} />

@@ -114,19 +114,19 @@ function Forecasting() {
             yFormatter={(v) => fmt(v)}
             referenceX={lastHistory?.date}
             series={[
-              { key: "upper", label: "Upper 80%", color: "#0e7490", kind: "area" },
-              { key: "lower", label: "Lower 80%", color: "#090d13", kind: "area" },
-              { key: "history", label: "Actual", color: "#22d3ee", kind: "line" },
-              { key: "forecast", label: "Forecast", color: "#a78bfa", kind: "line", dashed: true },
+              { key: "upper", label: "Upper 80%", color: "accent-soft", kind: "area" },
+              { key: "lower", label: "Lower 80%", color: "ground", kind: "area" },
+              { key: "history", label: "Actual", color: "accent", kind: "line" },
+              { key: "forecast", label: "Forecast", color: "ai", kind: "line", dashed: true },
             ]}
           />
         </ChartCard>
         <div className="space-y-3">
           <ChartCard title="Recommended staffing" subtitle={`Riders needed vs available by city over ${horizon}d`} empty={staffing.length === 0}>
-            <BarList rows={staffing.map((s) => ({ key: s.city, label: s.city, value: s.need, display: `${s.need}`, secondary: `${s.have} available · ${s.gap > 0 ? `+${s.gap} needed` : "ok"}`, color: s.gap > 0 ? "#f87171" : "#34d399" }))} />
+            <BarList rows={staffing.map((s) => ({ key: s.city, label: s.city, value: s.need, display: `${s.need}`, secondary: `${s.have} available · ${s.gap > 0 ? `+${s.gap} needed` : "ok"}`, color: s.gap > 0 ? "danger" : "good" }))} />
           </ChartCard>
           <ChartCard title="Hub congestion outlook" subtitle="Expected utilisation with forecast inbound" empty={hubShare.length === 0}>
-            <BarList rows={hubShare.slice(0, 8).map((x) => ({ key: x.h.id, label: x.h.name, value: x.util * 100, display: `${Math.round(x.util * 100)}%`, secondary: `+${Math.round(x.expectedPerDay)}/day`, color: x.util >= 0.9 ? "#f87171" : x.util >= 0.7 ? "#fbbf24" : "#34d399" }))} max={100} />
+            <BarList rows={hubShare.slice(0, 8).map((x) => ({ key: x.h.id, label: x.h.name, value: x.util * 100, display: `${Math.round(x.util * 100)}%`, secondary: `+${Math.round(x.expectedPerDay)}/day`, color: x.util >= 0.9 ? "danger" : x.util >= 0.7 ? "warning" : "good" }))} max={100} />
           </ChartCard>
         </div>
       </div>

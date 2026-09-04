@@ -111,7 +111,7 @@ export function KpiCard({
             </div>
             {trend && trend.length > 1 && (
               <div className="w-20 shrink-0">
-                <Sparkline values={trend} color={tone === "danger" ? "#f87171" : tone === "warning" ? "#fbbf24" : tone === "good" ? "#34d399" : "#22d3ee"} />
+                <Sparkline values={trend} color={tone === "danger" ? "danger" : tone === "warning" ? "warning" : tone === "good" ? "good" : "accent"} />
               </div>
             )}
           </div>

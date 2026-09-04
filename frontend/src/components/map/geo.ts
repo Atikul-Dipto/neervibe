@@ -117,10 +117,19 @@ export function inferVehicleLeg(
   currentNodeId: string | null,
   routes: LogisticsRoute[],
   nodesById: Map<string, LogisticsNode>,
+  /** The next stop when the live feed names it — always preferred over
+   *  inferring one from the heading. */
+  destinationNodeId?: string | null,
 ): VehicleLeg | null {
   if (live.status !== "EN_ROUTE" || !currentNodeId) return null;
   const source = nodesById.get(currentNodeId);
   if (!source) return null;
+
+  const stated = destinationNodeId ? nodesById.get(destinationNodeId) : undefined;
+  if (stated) {
+    const remainingKm = haversineKm(live, { lat: stated.latitude, lon: stated.longitude });
+    return { source, dest: stated, remainingKm, etaMinutes: live.speed > 1 ? (remainingKm / live.speed) * 60 : null };
+  }
 
   let best: LogisticsNode | null = null;
   let bestDiff = 20; // degrees — anything looser is a different edge

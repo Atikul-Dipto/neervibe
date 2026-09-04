@@ -83,7 +83,7 @@ function Merchants() {
             <BarList rows={merchants.slice(0, 10).map((m) => ({ key: m.id, label: m.name, value: m.total, secondary: m.city ?? undefined }))} onClick={(k) => cross.toggle("merchants", k, merchants.find((m) => m.id === k)?.name ?? k)} activeKey={cross.activeValue("merchants")} />
           </ChartCard>
           <ChartCard title="Highest return rates" subtitle="Merchants with at least 5 shipments" empty={merchants.filter((m) => m.total >= 5).length === 0}>
-            <BarList rows={merchants.filter((m) => m.total >= 5).sort((a, b) => (b.returnRate ?? 0) - (a.returnRate ?? 0)).slice(0, 6).map((m) => ({ key: m.id, label: m.name, value: (m.returnRate ?? 0) * 100, display: `${((m.returnRate ?? 0) * 100).toFixed(0)}%`, secondary: `${m.returns} returns`, color: "#f87171" }))} max={Math.max(20, ...merchants.map((m) => (m.returnRate ?? 0) * 100))} onClick={(k) => open("merchant", k)} />
+            <BarList rows={merchants.filter((m) => m.total >= 5).sort((a, b) => (b.returnRate ?? 0) - (a.returnRate ?? 0)).slice(0, 6).map((m) => ({ key: m.id, label: m.name, value: (m.returnRate ?? 0) * 100, display: `${((m.returnRate ?? 0) * 100).toFixed(0)}%`, secondary: `${m.returns} returns`, color: "danger" }))} max={Math.max(20, ...merchants.map((m) => (m.returnRate ?? 0) * 100))} onClick={(k) => open("merchant", k)} />
           </ChartCard>
         </div>
       </div>

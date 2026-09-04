@@ -119,7 +119,7 @@ function Dispatch() {
         .map((e) => ({ e, eff: e.estimated_travel_time / Math.max(e.current_travel_time, 1) }))
         .sort((a, b) => a.eff - b.eff)
         .slice(0, 8)
-        .map(({ e, eff }) => ({ key: e.id, label: `${derived.nodesById.get(e.source_node_id)?.city ?? "?"} → ${derived.nodesById.get(e.destination_node_id)?.city ?? "?"}`, value: eff * 100, display: `${Math.round(eff * 100)}%`, secondary: `${e.active_package_count} parcels · +${e.current_travel_time - e.estimated_travel_time} min`, color: eff < 0.6 ? "#f87171" : eff < 0.8 ? "#fbbf24" : "#34d399" })),
+        .map(({ e, eff }) => ({ key: e.id, label: `${derived.nodesById.get(e.source_node_id)?.city ?? "?"} → ${derived.nodesById.get(e.destination_node_id)?.city ?? "?"}`, value: eff * 100, display: `${Math.round(eff * 100)}%`, secondary: `${e.active_package_count} parcels · +${e.current_travel_time - e.estimated_travel_time} min`, color: eff < 0.6 ? "danger" : eff < 0.8 ? "warning" : "good" })),
     [derived],
   );
 

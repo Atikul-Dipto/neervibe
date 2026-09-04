@@ -1,70 +1,309 @@
 @import "tailwindcss";
 
-/* NeerVibe — dark-first control-tower theme.
-   Near-black chrome, charcoal surfaces, cyan as the operational accent,
-   electric blue for primary actions, violet for anything AI-generated.
-   The `nv-*` scale is the SURFACE LADDER every component is built on:
-   950 = page, 900 = surface (cards, inputs), 850 = hover / raised,
-   800 = border, 700 = strong border, 600 = muted fill. */
+/* ===========================================================================
+   NeerVibe theme
+   ---------------------------------------------------------------------------
+   Two themes, one token set. Components only ever reference semantic tokens
+   (`nv-*` surfaces, `ink-*` text, `accent-*` brand) or the small set of
+   Tailwind palette shades re-pointed below, so switching themes is a matter
+   of redefining variables — no component knows which theme is active.
+
+   BRAND PALETTE (supplied):
+     #F2F2F2  page ground
+     #689D4B  primary green — actions, brand accent, selection, "live"
+     #91AE6E  sage green    — success, healthy, secondary fills
+     #D96868  red           — danger, breached SLA, critical
+
+   Those four cover ground / primary / success / danger. An operations UI also
+   needs *warning* and *info* states plus an AI hue, which the four don't
+   supply, so three companions are derived at the same muted mid-chroma so
+   they read as one family:
+     #C08A2E  warning   #4A7BA7  info   #7E68A8  AI
+
+   SURFACE LADDER (`nv-*`) — the ladder every component is built on. The
+   numbers keep their meaning in both themes, only the values invert:
+     950 = page, 900 = surface (cards, inputs), 850 = hover / raised,
+     800 = border, 700 = strong border, 600 = muted fill.
+
+   INK LADDER (`ink-*`): 900 body, 700 strong secondary, 600 secondary,
+     500 muted labels, 400 disabled, 300 hairlines.
+   =========================================================================== */
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  --color-nv-950: #090d13;
-  --color-nv-900: #0f151d;
-  --color-nv-850: #151d27;
-  --color-nv-800: #1e2833;
-  --color-nv-700: #2a3644;
-  --color-nv-600: #364556;
+  --color-nv-950: var(--nv-950);
+  --color-nv-900: var(--nv-900);
+  --color-nv-850: var(--nv-850);
+  --color-nv-800: var(--nv-800);
+  --color-nv-700: var(--nv-700);
+  --color-nv-600: var(--nv-600);
 
-  /* Ink — text ladder. 900 body, 700 strong secondary, 600 secondary,
-     500 muted labels, 400 disabled, 300 hairlines. */
-  --color-ink-900: #e6edf3;
-  --color-ink-700: #c9d4df;
-  --color-ink-600: #a3b1c0;
-  --color-ink-500: #7c8a99;
-  --color-ink-400: #5d6b7a;
-  --color-ink-300: #414d5b;
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-600: var(--ink-600);
+  --color-ink-500: var(--ink-500);
+  --color-ink-400: var(--ink-400);
+  --color-ink-300: var(--ink-300);
 
-  /* Accent — cyan. 100/200 tinted backgrounds, 300 fills, 500 marks,
-     700 readable accent text on dark surfaces. */
-  --color-accent-100: #062a33;
-  --color-accent-200: #0b3d4a;
-  --color-accent-300: #0e7490;
-  --color-accent-500: #22d3ee;
-  --color-accent-700: #67e8f9;
+  /* Accent — the brand green. 100/200 tinted backgrounds, 300 fills,
+     500 marks, 700 readable accent text. */
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-500: var(--accent-500);
+  --color-accent-700: var(--accent-700);
 
-  /* Primary action — electric blue. */
-  --color-primary: #2f7cf6;
-  --color-primary-hover: #4d90f8;
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
 
-  /* AI — violet, reserved for generated content so it is always identifiable. */
-  --color-ai: #a78bfa;
-  --color-ai-deep: #7c5ce6;
+  --color-ai: var(--tone-ai-400);
+  --color-ai-deep: var(--tone-ai-600);
 
-  --color-success: #34d399;
-  --color-warning: #fbbf24;
-  --color-danger: #f87171;
-  --color-info: #60a5fa;
+  --color-success: var(--tone-good-400);
+  --color-warning: var(--tone-warn-400);
+  --color-danger: var(--tone-bad-400);
+  --color-info: var(--tone-info-400);
 
-  --color-bg: var(--color-nv-950);
-  --color-surface: var(--color-nv-900);
-  --color-surface-hover: var(--color-nv-850);
-  --color-border: var(--color-nv-800);
-  --color-border-strong: var(--color-nv-700);
+  --color-bg: var(--nv-950);
+  --color-surface: var(--nv-900);
+  --color-surface-hover: var(--nv-850);
+  --color-border: var(--nv-800);
+  --color-border-strong: var(--nv-700);
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 6px 20px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  /* --- Tailwind palette, re-pointed to theme tones -----------------------
+     The app writes semantic intent as familiar palette classes
+     (`text-emerald-300` = "good", `bg-rose-500/10` = "danger tint"). Rather
+     than rewrite 180 call sites, the shades in use are re-pointed at theme
+     variables, so every one of them follows the active theme. Only shades the
+     app actually uses are defined — adding a new one means adding it here.
+     In each ramp: 200 = text on a tinted ground, 300 = body text,
+     400 = dots and icons, 500/600 = solid fills. */
+  --color-emerald-200: var(--tone-good-200);
+  --color-emerald-300: var(--tone-good-300);
+  --color-emerald-400: var(--tone-good-400);
+  --color-emerald-500: var(--tone-good-500);
+
+  --color-rose-200: var(--tone-bad-200);
+  --color-rose-300: var(--tone-bad-300);
+  --color-rose-400: var(--tone-bad-400);
+  --color-rose-500: var(--tone-bad-500);
+
+  --color-amber-200: var(--tone-warn-200);
+  --color-amber-300: var(--tone-warn-300);
+  --color-amber-400: var(--tone-warn-400);
+  --color-amber-500: var(--tone-warn-500);
+
+  --color-cyan-300: var(--accent-700);
+  --color-cyan-400: var(--accent-500);
+  --color-cyan-500: var(--accent-500);
+
+  --color-violet-200: var(--tone-ai-200);
+  --color-violet-300: var(--tone-ai-300);
+  --color-violet-400: var(--tone-ai-400);
+  --color-violet-500: var(--tone-ai-500);
+
+  --color-blue-300: var(--tone-info-300);
+  --color-blue-400: var(--tone-info-400);
+  --color-blue-500: var(--tone-info-500);
+  --color-blue-600: var(--tone-info-600);
+
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
 
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
 }
 
-html {
-  color-scheme: dark;
+/* ---------------------------------------------------------------------------
+   LIGHT — the default.
+   --------------------------------------------------------------------------- */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --nv-950: #f2f2f2;
+  --nv-900: #ffffff;
+  --nv-850: #e9ebe4;
+  --nv-800: #dfe1d8;
+  --nv-700: #c7cbbc;
+  --nv-600: #a8ae9a;
+
+  --ink-900: #1f2419;
+  --ink-700: #3b4433;
+  --ink-600: #55604a;
+  --ink-500: #737e68;
+  --ink-400: #8f9885;
+  --ink-300: #b3baa8;
+
+  --accent-100: #eaf2e2;
+  --accent-200: #d9e8c9;
+  --accent-300: #91ae6e;
+  --accent-500: #689d4b;
+  --accent-700: #486f31;
+
+  --primary: #689d4b;
+  --primary-hover: #58873e;
+
+  --tone-good-200: #3b6224;
+  --tone-good-300: #4c7a31;
+  --tone-good-400: #91ae6e;
+  --tone-good-500: #6d9145;
+
+  --tone-bad-200: #99383a;
+  --tone-bad-300: #b04a4a;
+  --tone-bad-400: #d96868;
+  --tone-bad-500: #cd5757;
+
+  --tone-warn-200: #7a5312;
+  --tone-warn-300: #8e6417;
+  --tone-warn-400: #c08a2e;
+  --tone-warn-500: #b07c22;
+
+  --tone-info-300: #35607f;
+  --tone-info-400: #4a7ba7;
+  --tone-info-500: #3f6e97;
+  --tone-info-600: #345c80;
+
+  --tone-ai-200: #55437a;
+  --tone-ai-300: #64528c;
+  --tone-ai-400: #7e68a8;
+  --tone-ai-500: #715c9a;
+  --tone-ai-600: #5c4a80;
+
+  --elev-sm: 0 1px 2px rgba(31, 36, 25, 0.06);
+  --elev-md: 0 6px 18px -8px rgba(31, 36, 25, 0.22), 0 0 0 1px rgba(31, 36, 25, 0.05);
+  --elev-lg: 0 18px 44px -16px rgba(31, 36, 25, 0.3), 0 0 0 1px rgba(31, 36, 25, 0.07);
+
+  /* Data-viz ramp. A categorical chart needs more hues than a brand palette
+     carries, so the brand greens and red lead and the derived companions
+     follow. Every hue clears 3:1 on the light surface. */
+  --viz-1: #689d4b;
+  --viz-2: #4a7ba7;
+  --viz-3: #7e68a8;
+  --viz-4: #91ae6e;
+  --viz-5: #c08a2e;
+  --viz-6: #d96868;
+  --viz-7: #7c8570;
+  --viz-8: #b06a8c;
+  --viz-grid: #e2e4db;
+  --viz-axis: #737e68;
+  --viz-cursor: rgba(31, 36, 25, 0.05);
+
+  /* Map — light basemap, ink-on-paper network. */
+  --map-basemap: "light";
+  --map-bg: #f2f2f2;
+  --map-line: #8b9280;
+  --map-line-soft: #adb3a2;
 }
+
+/* ---------------------------------------------------------------------------
+   DARK — same hues, lifted for a dark ground so the two themes are one brand.
+   --------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --nv-950: #0c0f0a;
+  --nv-900: #141811;
+  --nv-850: #1c2118;
+  --nv-800: #262c20;
+  --nv-700: #363d2d;
+  --nv-600: #4a533e;
+
+  --ink-900: #e9eee2;
+  --ink-700: #ccd4c1;
+  --ink-600: #a8b29c;
+  --ink-500: #838d78;
+  --ink-400: #67715c;
+  --ink-300: #4b5442;
+
+  --accent-100: #1b2913;
+  --accent-200: #29401c;
+  --accent-300: #6d9145;
+  --accent-500: #8fc767;
+  --accent-700: #b0dd8d;
+
+  --primary: #689d4b;
+  --primary-hover: #7bb45a;
+
+  --tone-good-200: #d8e9c4;
+  --tone-good-300: #bcd79f;
+  --tone-good-400: #91ae6e;
+  --tone-good-500: #6d9145;
+
+  --tone-bad-200: #f6d4d4;
+  --tone-bad-300: #eda6a6;
+  --tone-bad-400: #d96868;
+  --tone-bad-500: #c85555;
+
+  --tone-warn-200: #f5e3c2;
+  --tone-warn-300: #e6c88b;
+  --tone-warn-400: #d9a55e;
+  --tone-warn-500: #c08a2e;
+
+  --tone-info-300: #9ec1de;
+  --tone-info-400: #6fa0c8;
+  --tone-info-500: #4a7ba7;
+  --tone-info-600: #3f6e97;
+
+  --tone-ai-200: #ded4f2;
+  --tone-ai-300: #bfaee2;
+  --tone-ai-400: #a08cc9;
+  --tone-ai-500: #7e68a8;
+  --tone-ai-600: #64528c;
+
+  --elev-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elev-md: 0 6px 20px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --elev-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+
+  --viz-1: #8fc767;
+  --viz-2: #6fa0c8;
+  --viz-3: #a08cc9;
+  --viz-4: #bcd79f;
+  --viz-5: #d9a55e;
+  --viz-6: #ef8a8a;
+  --viz-7: #9aa48d;
+  --viz-8: #d18cae;
+  --viz-grid: #262c20;
+  --viz-axis: #838d78;
+  --viz-cursor: rgba(255, 255, 255, 0.05);
+
+  --map-basemap: "dark";
+  --map-bg: #0c0f0a;
+  --map-line: #7d876f;
+  --map-line-soft: #5a6350;
+}
+
+/* ---------------------------------------------------------------------------
+   Z-LAYERS — one scale, so chrome can never be buried by page content.
+   The bug this fixes: the top bar sets `backdrop-filter`, which makes it a
+   stacking context; because it was otherwise unpositioned it painted *below*
+   the positioned <main>, taking its own dropdowns down with it. Every piece
+   of chrome now carries an explicit layer, and <main> is isolated so nothing
+   inside a page can escape above them.
+   --------------------------------------------------------------------------- */
+:root {
+  --z-content: 0;
+  --z-map-overlay: 10;
+  --z-drawer: 30;
+  --z-filterbar: 40;
+  --z-topbar: 50;
+  --z-sidebar: 60;
+  --z-popover: 70;
+  --z-modal: 80;
+  --z-toast: 90;
+}
+
+.layer-content { z-index: var(--z-content); isolation: isolate; }
+.layer-drawer { z-index: var(--z-drawer); }
+.layer-filterbar { z-index: var(--z-filterbar); }
+.layer-topbar { z-index: var(--z-topbar); }
+.layer-sidebar { z-index: var(--z-sidebar); }
+.layer-popover { z-index: var(--z-popover); }
+.layer-modal { z-index: var(--z-modal); }
 
 html,
 body,
@@ -73,17 +312,17 @@ body,
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--color-accent-500) 35%, transparent);
+  background: color-mix(in oklab, var(--primary) 28%, transparent);
 }
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-nv-700) transparent;
+  scrollbar-color: var(--nv-700) transparent;
 }
 
 /* Keyboard focus is always visible; pointer focus stays quiet. */
 :focus-visible {
-  outline: 2px solid var(--color-accent-500);
+  outline: 2px solid var(--primary);
   outline-offset: 1px;
 }
 
@@ -91,8 +330,8 @@ body,
    ring for live-status dots. Used via arbitrary values, e.g.
    animate-[breathe_2.4s_ease-in-out_infinite]. */
 @keyframes breathe {
-  0%, 100% { box-shadow: 0 0 6px 1px rgba(34, 211, 238, 0.45); }
-  50% { box-shadow: 0 0 14px 4px rgba(34, 211, 238, 0.85); }
+  0%, 100% { box-shadow: 0 0 6px 1px color-mix(in oklab, var(--accent-500) 45%, transparent); }
+  50% { box-shadow: 0 0 14px 4px color-mix(in oklab, var(--accent-500) 85%, transparent); }
 }
 @keyframes pulse-ring {
   0% { box-shadow: 0 0 0 0 currentColor; }
@@ -113,4 +352,13 @@ body,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* MapLibre chrome inherits the theme rather than shipping its own light box. */
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background: color-mix(in oklab, var(--nv-900) 88%, transparent);
+  color: var(--ink-500);
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--ink-600);
 }

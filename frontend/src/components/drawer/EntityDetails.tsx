@@ -20,7 +20,8 @@ import { Progress, Stat, utilizationTone } from "@/components/ui/primitives";
 import { ErrorState } from "@/components/ui/States";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { DrawerSection, EntityLink, KV, NotFound, RecommendationCard, ShipmentList } from "./shared";
-import { NODE_TYPE_COLORS } from "@/components/map/nodeStyle";
+import { nodeTypeColors } from "@/components/map/nodeStyle";
+import { roadRemainingFrom, useRoads } from "@/components/map/roads";
 
 function useShipmentsLink() {
   const router = useRouter();
@@ -170,7 +171,7 @@ export function NodeDetail({ id }: { id: string }) {
           <div>
             <div className="text-sm font-semibold text-ink-900">{node.node_name}</div>
             <div className="flex items-center gap-1.5 text-[11px] text-ink-500">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: NODE_TYPE_COLORS[node.node_type] }} />
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: nodeTypeColors()[node.node_type] }} />
               {humanize(node.node_type)} · {node.city}
               {region.district && ` · ${region.district}`}
             </div>
@@ -239,7 +240,7 @@ export function RiderDetail({ id }: { id: string }) {
           {r.vehicle && <StatusPill tone="info">{r.vehicle.registration_number}</StatusPill>}
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(#22d3ee ${r.score ?? 0}%, #1e2833 0)` }}>
+          <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full" style={{ background: `conic-gradient(var(--accent-500) ${r.score ?? 0}%, var(--nv-800) 0)` }}>
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-nv-950 text-sm font-semibold tabular-nums text-ink-900">{r.score ?? "—"}</div>
           </div>
           <div className="text-[11px] text-ink-500">
@@ -322,6 +323,7 @@ export function VehicleDetail({ id }: { id: string }) {
   const live = useControlTowerStore((s) => s.vehicles.get(id));
   const selectVehicle = useControlTowerStore((s) => s.selectVehicle);
   const setFollow = useControlTowerStore((s) => s.setFollowVehicle);
+  const roads = useRoads();
   const v = derived.vehiclesById.get(id);
   if (!v) return <NotFound what="vehicle" />;
   const driver = derived.riders.find((r) => r.rider.vehicle_id === v.id) ?? null;
@@ -329,9 +331,21 @@ export function VehicleDetail({ id }: { id: string }) {
   const weight = load.reduce((sum, s) => sum + s.pkg.package_weight, 0);
   const status = live?.status ?? v.status;
   const leg = live
-    ? inferVehicleLeg({ lat: live.latitude, lon: live.longitude, heading: live.heading, speed: live.speed, status: live.status }, live.current_node_id ?? v.current_node_id, derived.routes, derived.nodesById)
+    ? inferVehicleLeg({ lat: live.latitude, lon: live.longitude, heading: live.heading, speed: live.speed, status: live.status }, live.current_node_id ?? v.current_node_id, derived.routes, derived.nodesById, live.destination_node_id)
     : null;
   const dest = live?.destination_node_id ? derived.nodesById.get(live.destination_node_id) : leg?.dest;
+  // Distance to go along the road actually being driven, not across country.
+  const onRoad =
+    leg && live
+      ? roadRemainingFrom(
+          roads,
+          { lat: leg.source.latitude, lon: leg.source.longitude },
+          { lat: live.latitude, lon: live.longitude },
+          { lat: leg.dest.latitude, lon: leg.dest.longitude },
+        )
+      : null;
+  const remaining = onRoad?.km ?? leg?.remainingKm ?? null;
+  const etaMinutes = remaining != null && live && live.speed > 1 ? (remaining / live.speed) * 60 : leg?.etaMinutes ?? null;
   return (
     <div>
       <div className="border-b border-nv-800 px-4 py-3">
@@ -367,7 +381,7 @@ export function VehicleDetail({ id }: { id: string }) {
               {dest.node_name}
             </EntityLink>
             <div className="text-[11px] text-ink-500">
-              {leg ? `${leg.remainingKm.toFixed(1)} km · ${formatMinutes(leg.etaMinutes)}` : dest.city}
+              {remaining != null ? `${remaining.toFixed(1)} km · ${formatMinutes(etaMinutes)}${onRoad && onRoad.variant.name !== "primary" ? " · longer road" : ""}` : dest.city}
             </div>
           </div>
         ) : (

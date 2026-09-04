@@ -127,7 +127,7 @@ export function GlobalSearch() {
         <Kbd>K</Kbd>
       </span>
       {open && q.trim() && (
-        <div id="global-search-results" role="listbox" className="absolute left-0 right-0 z-40 mt-1 max-h-96 overflow-y-auto rounded-md border border-nv-700 bg-nv-900 p-1 shadow-[var(--shadow-lg)] animate-[rise-in_120ms_ease-out]">
+        <div id="global-search-results" role="listbox" className="layer-popover absolute left-0 right-0 mt-1 max-h-96 overflow-y-auto rounded-md border border-nv-700 bg-nv-900 p-1 shadow-[var(--shadow-lg)] animate-[rise-in_120ms_ease-out]">
           {hits.length === 0 ? (
             <div className="px-3 py-4 text-center text-xs text-ink-500">No matches for “{q.trim()}”.</div>
           ) : (

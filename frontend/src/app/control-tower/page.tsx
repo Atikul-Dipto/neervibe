@@ -105,7 +105,7 @@ function ControlTower() {
               <div className="p-4 text-center text-xs text-ink-500">Nothing in this queue for the current filters.</div>
             ) : (
               list.map((s) => (
-                <button key={s.id} onClick={() => open("shipment", s.id)} className={clsx("mb-0.5 flex w-full flex-col gap-0.5 rounded px-2 py-1.5 text-left hover:bg-nv-850", drawerItem?.kind === "shipment" && drawerItem.id === s.id && "bg-accent-100/40 shadow-[inset_2px_0_0_0_#22d3ee]")}>
+                <button key={s.id} onClick={() => open("shipment", s.id)} className={clsx("mb-0.5 flex w-full flex-col gap-0.5 rounded px-2 py-1.5 text-left hover:bg-nv-850", drawerItem?.kind === "shipment" && drawerItem.id === s.id && "bg-accent-100/40 shadow-[inset_2px_0_0_0_var(--primary)]")}>
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-mono text-[11px] text-ink-900">{s.trackingNumber}</span>
                     <RiskBadge score={s.riskScore} />

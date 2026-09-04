@@ -156,7 +156,7 @@ export function DataTable<T>({
               Columns
             </Button>
             {colMenu && (
-              <div role="menu" className="absolute right-0 z-20 mt-1 w-48 rounded-md border border-nv-700 bg-nv-900 p-1.5 shadow-[var(--shadow-lg)]">
+              <div role="menu" className="layer-popover absolute right-0 mt-1 w-48 rounded-md border border-nv-700 bg-nv-900 p-1.5 shadow-[var(--shadow-lg)]">
                 {columns.map((c) => (
                   <label key={c.key} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs text-ink-700 hover:bg-nv-850">
                     <input
@@ -232,7 +232,7 @@ export function DataTable<T>({
                     className={clsx(
                       "transition-colors",
                       onRowClick && "cursor-pointer hover:bg-nv-850/70",
-                      isActive && "bg-accent-100/40 shadow-[inset_2px_0_0_0_#22d3ee]",
+                      isActive && "bg-accent-100/40 shadow-[inset_2px_0_0_0_var(--primary)]",
                       isSelected && !isActive && "bg-nv-850/50",
                       rowClassName?.(row),
                     )}

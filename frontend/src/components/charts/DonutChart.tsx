@@ -2,13 +2,13 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import clsx from "clsx";
-import { CHART } from "./chartTheme";
+import { useChartTheme, type ChartColor } from "./chartTheme";
 
 export interface DonutSlice {
   key: string;
   label: string;
   value: number;
-  color: string;
+  color: ChartColor;
 }
 
 export function DonutChart({
@@ -26,6 +26,7 @@ export function DonutChart({
   activeKey?: string | null;
   height?: number;
 }) {
+  const CHART = useChartTheme();
   const shown = slices.filter((s) => s.value > 0);
   const total = shown.reduce((s, x) => s + x.value, 0);
   if (total === 0) return <div className="py-6 text-center text-xs text-ink-500">No data for the current filters.</div>;
@@ -47,10 +48,10 @@ export function DonutChart({
               style={{ cursor: onClick ? "pointer" : undefined }}
             >
               {shown.map((s) => (
-                <Cell key={s.key} fill={s.color} opacity={activeKey && activeKey !== s.key ? 0.35 : 1} />
+                <Cell key={s.key} fill={CHART.color(s.color)} opacity={activeKey && activeKey !== s.key ? 0.35 : 1} />
               ))}
             </Pie>
-            <Tooltip contentStyle={CHART.tooltip} itemStyle={{ color: "#e6edf3" }} formatter={(v) => [Number(v).toLocaleString(), ""]} />
+            <Tooltip contentStyle={CHART.tooltip} itemStyle={{ color: CHART.tooltip.color }} formatter={(v) => [Number(v).toLocaleString(), ""]} />
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
@@ -71,7 +72,7 @@ export function DonutChart({
             aria-pressed={activeKey === s.key}
           >
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: s.color }} />
+              <span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: CHART.color(s.color) }} />
               <span className="truncate">{s.label}</span>
             </span>
             <span className="shrink-0 tabular-nums">

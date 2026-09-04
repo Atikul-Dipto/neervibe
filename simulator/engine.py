@@ -15,6 +15,7 @@ Run standalone:
 import asyncio
 import json
 import logging
+import math
 import random
 import sys
 import uuid
@@ -38,6 +39,7 @@ from app.models.node import LogisticsNode
 from app.models.package import Package
 from app.models.vehicle import Rider, Vehicle
 from app.services.placement import TERMINAL_STATUSES
+from app.services.road_geometry import RoadGeometry, RoadVariant, get_road_geometry
 from app.state_machine.package_state_machine import is_valid_transition, next_possible_statuses
 from simulator import redis_channels
 
@@ -51,6 +53,9 @@ class VehicleRuntime:
     current_edge: LogisticsEdge | None = None
     progress: float = 0.0  # 0.0 (source) .. 1.0 (destination)
     package_ids: list[uuid.UUID] = field(default_factory=list)
+    #: The road this trip is driving. None when the corridor has no geometry,
+    #: in which case movement degrades to the old straight line.
+    road: RoadVariant | None = None
 
 
 def interpolate(lat1: float, lon1: float, lat2: float, lon2: float, t: float) -> tuple[float, float]:
@@ -64,6 +69,7 @@ class SimulationEngine:
         self.edges: list[LogisticsEdge] = []
         self.edges_by_source: dict[uuid.UUID, list[LogisticsEdge]] = {}
         self.vehicle_runtime: dict[uuid.UUID, VehicleRuntime] = {}
+        self.roads: RoadGeometry = get_road_geometry()
         self.tick_count = 0
 
     async def load_network(self, session: AsyncSession) -> None:
@@ -108,6 +114,17 @@ class SimulationEngine:
         candidates = self.edges_by_source.get(node_id, [])
         return random.choice(candidates) if candidates else None
 
+    def road_for(self, edge: LogisticsEdge) -> RoadVariant | None:
+        """The road this trip drives - usually the fastest, occasionally the
+        longer alternative where the corridor actually has one."""
+        source = self.nodes.get(edge.source_node_id)
+        dest = self.nodes.get(edge.destination_node_id)
+        if source is None or dest is None:
+            return None
+        return self.roads.choose_variant(
+            source.longitude, source.latitude, dest.longitude, dest.latitude, random
+        )
+
     async def move_vehicles(self, session: AsyncSession, vehicles: list[Vehicle]) -> None:
         for vehicle in vehicles:
             runtime = self.vehicle_runtime[vehicle.id]
@@ -118,15 +135,22 @@ class SimulationEngine:
                     continue
                 runtime.current_edge = edge
                 runtime.progress = 0.0
+                runtime.road = self.road_for(edge)
                 vehicle.status = VehicleStatus.EN_ROUTE
 
             edge = runtime.current_edge
-            travel_seconds = edge.current_travel_time * 60 / settings.simulation_time_acceleration
-            travel_ticks = max(1, round(travel_seconds / settings.simulation_tick_seconds))
-            runtime.progress += 1.0 / travel_ticks
-
             source = self.nodes[edge.source_node_id]
             dest = self.nodes[edge.destination_node_id]
+
+            # A detour is a longer road, so it takes proportionally longer.
+            detour_factor = 1.0
+            if runtime.road is not None and edge.distance_km:
+                detour_factor = max(1.0, (runtime.road.length_m / 1000) / edge.distance_km)
+            travel_seconds = (
+                edge.current_travel_time * 60 * detour_factor / settings.simulation_time_acceleration
+            )
+            travel_ticks = max(1, round(travel_seconds / settings.simulation_tick_seconds))
+            runtime.progress += 1.0 / travel_ticks
 
             if runtime.progress >= 1.0:
                 vehicle.current_latitude = dest.latitude
@@ -136,18 +160,30 @@ class SimulationEngine:
                 vehicle.status = VehicleStatus.UNLOADING
                 await self.advance_packages_at_node(session, vehicle, dest)
                 runtime.current_edge = None
+                runtime.road = None
                 runtime.progress = 0.0
             else:
-                lat, lon = interpolate(source.latitude, source.longitude, dest.latitude, dest.longitude, runtime.progress)
+                if runtime.road is not None:
+                    # Follow the road: position and heading both come off the
+                    # polyline, so a vehicle never crosses water it cannot.
+                    lat, lon, heading = RoadGeometry.position_at(runtime.road, runtime.progress)
+                else:
+                    lat, lon = interpolate(
+                        source.latitude, source.longitude, dest.latitude, dest.longitude, runtime.progress
+                    )
+                    heading = (
+                        math.degrees(
+                            math.atan2(dest.longitude - source.longitude, dest.latitude - source.latitude)
+                        )
+                        + 360
+                    ) % 360
                 vehicle.current_latitude = lat
                 vehicle.current_longitude = lon
                 base_speed = {"HIGHWAY": 70, "ARTERIAL": 45, "URBAN": 25, "RURAL": 35, "FERRY": 20}.get(
                     edge.road_type, 40
                 )
                 vehicle.speed = base_speed * (1 - edge.congestion_level * 0.6)
-                dlat, dlon = dest.latitude - source.latitude, dest.longitude - source.longitude
-                import math
-                vehicle.heading = (math.degrees(math.atan2(dlon, dlat)) + 360) % 360
+                vehicle.heading = heading
 
             await self.publish_vehicle(vehicle)
 
@@ -282,6 +318,11 @@ class SimulationEngine:
             "status": vehicle.status,
             "current_node_id": str(vehicle.current_node_id) if vehicle.current_node_id else None,
             "destination_node_id": str(edge.destination_node_id) if edge is not None else None,
+            # Which physical road this vehicle is on and how far along it is.
+            # The map matches position to geometry independently; this makes a
+            # detour unambiguous rather than inferred.
+            "road_variant": runtime.road.name if runtime and runtime.road else None,
+            "road_progress": round(runtime.progress, 4) if runtime and runtime.current_edge else None,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         await self.redis.publish(redis_channels.VEHICLES, json.dumps(payload))

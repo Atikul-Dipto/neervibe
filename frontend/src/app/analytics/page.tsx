@@ -9,7 +9,7 @@ import { ChartCard } from "@/components/charts/ChartCard";
 import { BarList } from "@/components/charts/BarList";
 import { TrendChart } from "@/components/charts/TrendChart";
 import { financeFor, STATUS_GROUPS, type Shipment } from "@/data/derive";
-import { STATUS_GROUP_COLORS } from "@/components/charts/chartTheme";
+import { useChartTheme } from "@/components/charts/chartTheme";
 import { useCross, useDrill, useOpenDrawer } from "@/data/hooks";
 import { PRESET_LABELS } from "@/data/filters";
 import { formatBDT, formatDate, formatPct, humanize } from "@/data/format";
@@ -32,6 +32,7 @@ const FUNNEL: { key: string; label: string; reached: (s: Shipment) => boolean }[
 ];
 
 function Analytics() {
+  const chart = useChartTheme();
   const { derived, shipments, previous, daily, filters, now } = usePageData();
   const drill = useDrill();
   const open = useOpenDrawer();
@@ -56,7 +57,7 @@ function Analytics() {
   const prev = kpi(previous);
   const d = (a: number | null, b: number | null, pp = false) => (a == null || b == null ? null : pp ? a - b : b === 0 ? null : ((a - b) / b) * 100);
 
-  const funnel = FUNNEL.map((f, i) => ({ ...f, n: shipments.filter(f.reached).length, color: ["#94a3b8", "#22d3ee", "#60a5fa", "#a78bfa", "#fbbf24", "#34d399"][i] }));
+  const funnel = FUNNEL.map((f, i) => ({ ...f, n: shipments.filter(f.reached).length, color: ["muted", "accent", "info", "ai", "warning", "good"][i] }));
 
   const cohorts = useMemo(() => {
     const weeks = new Map<string, Shipment[]>();
@@ -104,7 +105,7 @@ function Analytics() {
   const costByCity = useMemo(() => {
     const cities = new Map<string, Shipment[]>();
     for (const s of shipments) cities.set(s.city, [...(cities.get(s.city) ?? []), s]);
-    return [...cities.entries()].map(([city, list]) => ({ key: city, label: city, value: financeFor(list, now).cost / list.length, display: formatBDT(financeFor(list, now).cost / list.length), secondary: `${list.length} shipments`, color: "#a78bfa" })).sort((a, b) => b.value - a.value);
+    return [...cities.entries()].map(([city, list]) => ({ key: city, label: city, value: financeFor(list, now).cost / list.length, display: formatBDT(financeFor(list, now).cost / list.length), secondary: `${list.length} shipments`, color: "ai" })).sort((a, b) => b.value - a.value);
   }, [shipments, now]);
 
   return (
@@ -132,10 +133,10 @@ function Analytics() {
 
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
         <ChartCard title="Cohort analysis" subtitle="By creation week: delivery rate, SLA and average delivery hours" empty={cohorts.length === 0}>
-          <TrendChart data={cohorts} xKey="week" height={200} series={[{ key: "created", label: "Created", color: "#22d3ee", kind: "bar" }, { key: "deliveryRate", label: "Delivery %", color: "#34d399", kind: "line", yAxisId: "right" }, { key: "sla", label: "SLA %", color: "#fbbf24", kind: "line", yAxisId: "right", dashed: true }]} />
+          <TrendChart data={cohorts} xKey="week" height={200} series={[{ key: "created", label: "Created", color: "accent", kind: "bar" }, { key: "deliveryRate", label: "Delivery %", color: "good", kind: "line", yAxisId: "right" }, { key: "sla", label: "SLA %", color: "warning", kind: "line", yAxisId: "right", dashed: true }]} />
         </ChartCard>
         <ChartCard title="Pareto · merchants" subtitle={pareto.count ? `${pareto.eighty} of ${pareto.count} merchants generate 80% of volume` : "No merchants"} empty={pareto.rows.length === 0}>
-          <BarList rows={pareto.rows.map((r, i) => ({ key: r.name + i, label: r.name, value: r.n, secondary: `${r.cum}% cum.`, color: r.cum <= 80 ? "#22d3ee" : "#64748b" }))} />
+          <BarList rows={pareto.rows.map((r, i) => ({ key: r.name + i, label: r.name, value: r.n, secondary: `${r.cum}% cum.`, color: r.cum <= 80 ? "accent" : "muted" }))} />
         </ChartCard>
         <CityPerformanceCard shipments={shipments} />
       </div>
@@ -161,7 +162,7 @@ function Analytics() {
                       <button
                         onClick={() => drill("/shipments", { cities: [row.city], statusGroups: [STATUS_GROUPS[i].key] })}
                         className={clsx("w-full rounded px-1 py-1 tabular-nums transition-colors hover:ring-1 hover:ring-cyan-400", n === 0 ? "text-ink-400" : "text-ink-900")}
-                        style={{ backgroundColor: n === 0 ? "transparent" : `${STATUS_GROUP_COLORS[STATUS_GROUPS[i].key]}${Math.round(20 + (n / matrixMax) * 70).toString(16).padStart(2, "0")}` }}
+                        style={{ backgroundColor: n === 0 ? "transparent" : `${chart.statusGroup[STATUS_GROUPS[i].key]}${Math.round(20 + (n / matrixMax) * 70).toString(16).padStart(2, "0")}` }}
                         title={`${row.city} · ${STATUS_GROUPS[i].label}: ${n}`}
                       >
                         {n}
@@ -184,10 +185,10 @@ function Analytics() {
           <BarList rows={[...derived.hubs].map((h) => ({ key: h.id, label: h.name, value: h.atHub.length + h.inbound.length + h.outbound.length, secondary: `${Math.round(h.utilization * 100)}% util.` })).sort((a, b) => b.value - a.value).slice(0, 8)} onClick={(k) => open("hub", k)} />
         </ChartCard>
         <ChartCard title="Rider ranking" subtitle="Deliveries completed · click for profile" empty={derived.riders.length === 0}>
-          <BarList rows={[...derived.riders].sort((a, b) => b.deliveries - a.deliveries).slice(0, 8).map((r) => ({ key: r.id, label: r.name, value: r.deliveries, secondary: `score ${r.score ?? "—"}`, color: "#34d399" }))} onClick={(k) => open("rider", k)} />
+          <BarList rows={[...derived.riders].sort((a, b) => b.deliveries - a.deliveries).slice(0, 8).map((r) => ({ key: r.id, label: r.name, value: r.deliveries, secondary: `score ${r.score ?? "—"}`, color: "good" }))} onClick={(k) => open("rider", k)} />
         </ChartCard>
         <ChartCard title="Return analysis" subtitle="Returns by package type" empty={shipments.filter((s) => s.group === "returns").length === 0}>
-          <BarList rows={[...new Set(shipments.filter((s) => s.group === "returns").map((s) => s.pkg.package_type))].map((t) => ({ key: t, label: humanize(t), value: shipments.filter((s) => s.group === "returns" && s.pkg.package_type === t).length, color: "#fbbf24" })).sort((a, b) => b.value - a.value)} />
+          <BarList rows={[...new Set(shipments.filter((s) => s.group === "returns").map((s) => s.pkg.package_type))].map((t) => ({ key: t, label: humanize(t), value: shipments.filter((s) => s.group === "returns" && s.pkg.package_type === t).length, color: "warning" })).sort((a, b) => b.value - a.value)} />
         </ChartCard>
       </div>
     </Page>

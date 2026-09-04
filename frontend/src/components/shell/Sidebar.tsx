@@ -107,14 +107,14 @@ export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boolean; on
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
         className={clsx(
-          "relative z-30 hidden h-full shrink-0 border-r border-nv-800 bg-nv-950 transition-[width] duration-200 md:block",
+          "layer-sidebar relative hidden h-full shrink-0 border-r border-nv-800 bg-nv-950 transition-[width] duration-200 md:block",
           expanded ? "w-56" : "w-14",
         )}
       >
         {content}
       </aside>
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
+        <div className="layer-modal fixed inset-0 md:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={onMobileClose} aria-hidden />
           <aside className="absolute inset-y-0 left-0 w-64 border-r border-nv-800 bg-nv-950 shadow-[var(--shadow-lg)]">{content}</aside>
         </div>

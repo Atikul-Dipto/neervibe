@@ -21,6 +21,10 @@ export const COUNTRY = {
   } satisfies Record<RegionLevel, { label: string; file: string }>,
   /** Zoom at which the finer level (districts) starts to appear. */
   districtRevealZoom: 7,
+  /** Driving geometry for every connected pair of nodes, built by
+   *  scripts/prep-roads.mjs. Vehicles and corridors are drawn along these
+   *  rather than along straight lines between coordinates. */
+  roadsFile: "/geo/bd/roads.json",
   attribution:
-    'Boundaries © <a href="https://www.geoboundaries.org" target="_blank" rel="noreferrer">geoBoundaries</a> (BBS / OCHA)',
+    'Boundaries © <a href="https://www.geoboundaries.org" target="_blank" rel="noreferrer">geoBoundaries</a> (BBS / OCHA) · Roads © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
 };

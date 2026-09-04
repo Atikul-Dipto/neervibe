@@ -11,20 +11,35 @@ import {
   type MapMouseEvent,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { AlertTriangle, Loader2, MapPin, X } from "lucide-react";
+import { AlertTriangle, Loader2, MapPin, Route, X } from "lucide-react";
+import clsx from "clsx";
 import { COUNTRY } from "@/config/country";
+import { cssVar, useTheme, type Theme } from "@/data/theme";
 import { useControlTowerStore, type MapLayerKey } from "@/store/useControlTowerStore";
 import { useDerived, useDataStatus } from "@/data/provider";
 import { useFilterStore, effectiveLists } from "@/data/filters";
 import { useDrawerStore } from "@/data/drawer";
-import { NODE_TYPE_COLORS, NODE_TYPE_RADIUS, congestionColor } from "./nodeStyle";
+import { nodeTypeColors, NODE_TYPE_RADIUS, congestionColor } from "./nodeStyle";
 import { bboxOfPositions, bearingBetween, findRegionAt, inferVehicleLeg, type BBox, type LatLon, type RegionFeature, type VehicleLeg } from "./geo";
+import {
+  fetchLiveRoute,
+  matchRoad,
+  remainingKm as roadRemainingKm,
+  splitRoad,
+  useRoads,
+  OFF_ROUTE_M,
+  type RoadMatch,
+  type RoadNetwork,
+} from "./roads";
 import { MapControls } from "./MapControls";
 import type { Derived } from "@/data/derive";
 import type { LogisticsNode, LogisticsRoute } from "@/types/domain";
 
-// CARTO Dark Matter — the near-black basemap the control-tower theme sits on.
-const BASEMAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+// CARTO basemaps, one per theme: Positron on light, Dark Matter on dark.
+const BASEMAP_STYLE: Record<Theme, string> = {
+  light: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+  dark: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+};
 const INTRO_START_ZOOM = 1.6;
 const INTRO_DURATION_MS = 2400;
 const FOCUS_ZOOM = 11;
@@ -36,21 +51,31 @@ const FIT_PADDING = { top: 84, bottom: 56, left: 48, right: 64 };
 const VEHICLE_TICK_MS = 2900;
 const TRAIL_LENGTH = 40;
 
-const CYAN = "#22d3ee";
-const CYAN_DEEP = "#0e7490";
-const BLUE = "#60a5fa";
-const EMERALD = "#34d399";
-const AMBER = "#fbbf24";
-const ROSE = "#f87171";
-const INK = "#e6edf3";
-const BG = "#090d13";
-const LINE = "#94a3b8";
-const LINE_SOFT = "#64748b";
+/** Map paint colours, read out of the stylesheet so the map follows the theme.
+ * Resolved once at mount; the map remounts when the theme changes. */
+function mapPalette() {
+  return {
+    CYAN: cssVar("--accent-500", "#689d4b"),
+    CYAN_DEEP: cssVar("--accent-700", "#486f31"),
+    BLUE: cssVar("--tone-info-400", "#4a7ba7"),
+    EMERALD: cssVar("--tone-good-500", "#6d9145"),
+    AMBER: cssVar("--tone-warn-400", "#c08a2e"),
+    ROSE: cssVar("--tone-bad-400", "#d96868"),
+    INK: cssVar("--ink-900", "#1f2419"),
+    BG: cssVar("--map-bg", "#f2f2f2"),
+    LINE: cssVar("--map-line", "#8b9280"),
+    LINE_SOFT: cssVar("--map-line-soft", "#adb3a2"),
+  };
+}
+type MapPalette = ReturnType<typeof mapPalette>;
 
 const DASH_SEQUENCE: number[][] = [
   [0, 4, 3], [0.5, 4, 2.5], [1, 4, 2], [1.5, 4, 1.5], [2, 4, 1], [2.5, 4, 0.5], [3, 4, 0],
   [0, 0.5, 3, 3.5], [0, 1, 3, 3], [0, 1.5, 3, 2.5], [0, 2, 3, 2], [0, 2.5, 3, 1.5], [0, 3, 3, 1], [0, 3.5, 3, 0.5],
 ];
+
+/** Survives the remount a theme switch causes; deliberately module scope. */
+let lastCamera: { center: [number, number]; zoom: number; bearing: number; pitch: number } | null = null;
 
 const EMPTY_FC: GeoJSON.FeatureCollection = { type: "FeatureCollection", features: [] };
 const fc = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({ type: "FeatureCollection", features });
@@ -58,13 +83,23 @@ const fc = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({ type: 
 const LAYER_GROUPS: Record<MapLayerKey, string[]> = {
   nodes: ["nodes-circle"],
   routes: ["routes-line"],
-  vehicles: ["vehicles-symbol", "vehicle-trail", "vehicle-leg"],
+  vehicles: ["vehicles-symbol", "vehicle-trail", "vehicle-leg", "vehicle-road"],
   riders: ["riders-circle"],
   boundaries: ["division-fill", "district-fill", "division-dim", "district-dim", "district-line", "division-line", "region-focus-fill", "region-focus-line"],
   heatmap: ["heat"],
   risk: [],
   labels: [],
 };
+
+interface RouteInfo {
+  /** Which road of the corridor the vehicle is on. */
+  kind: "fastest" | "alternative" | "off-route";
+  remainingKm: number;
+  /** How much longer than the fastest road, when on an alternative. */
+  extraKm: number;
+  extraMin: number;
+  destination: string;
+}
 
 type PickKind = "vehicle" | "rider" | "node" | "district" | "division";
 const PICK_ORDER: [string, PickKind][] = [
@@ -76,6 +111,7 @@ const PICK_ORDER: [string, PickKind][] = [
 ];
 
 function nodesToGeoJSON(nodes: LogisticsNode[], risk: Map<string, number>): GeoJSON.FeatureCollection {
+  const colors = nodeTypeColors();
   return fc(
     nodes.map((n) => ({
       type: "Feature",
@@ -86,7 +122,7 @@ function nodesToGeoJSON(nodes: LogisticsNode[], risk: Map<string, number>): GeoJ
         node_name: n.node_name,
         node_type: n.node_type,
         city: n.city,
-        color: NODE_TYPE_COLORS[n.node_type],
+        color: colors[n.node_type],
         radius: NODE_TYPE_RADIUS[n.node_type],
         risk: risk.get(n.id) ?? 0,
       },
@@ -94,15 +130,27 @@ function nodesToGeoJSON(nodes: LogisticsNode[], risk: Map<string, number>): GeoJ
   );
 }
 
-function routesToGeoJSON(routes: LogisticsRoute[], nodesById: Map<string, LogisticsNode>): GeoJSON.FeatureCollection {
+function routesToGeoJSON(
+  routes: LogisticsRoute[],
+  nodesById: Map<string, LogisticsNode>,
+  roads: RoadNetwork | null,
+): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
   for (const r of routes) {
     const source = nodesById.get(r.source_node_id);
     const dest = nodesById.get(r.destination_node_id);
     if (!source || !dest) continue;
+    // The road where geometry exists; the direct line only as a fallback, so a
+    // corridor is never drawn as a chord across water.
+    const coordinates = roads
+      ? roads.line(
+          { lat: source.latitude, lon: source.longitude },
+          { lat: dest.latitude, lon: dest.longitude },
+        )
+      : ([[source.longitude, source.latitude], [dest.longitude, dest.latitude]] as [number, number][]);
     features.push({
       type: "Feature",
-      geometry: { type: "LineString", coordinates: [[source.longitude, source.latitude], [dest.longitude, dest.latitude]] },
+      geometry: { type: "LineString", coordinates },
       properties: { id: r.id, congestion_level: r.congestion_level, color: congestionColor(r.congestion_level), route_status: r.route_status, packages: r.active_package_count },
     });
   }
@@ -116,14 +164,14 @@ function lineFeature(coordinates: [number, number][], properties: Record<string,
   return { type: "Feature", geometry: { type: "LineString", coordinates }, properties };
 }
 
-function buildVehicleArrowIcon(): ImageData {
+function buildVehicleArrowIcon(P: MapPalette): ImageData {
   const size = 32;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = CYAN;
-  ctx.strokeStyle = BG;
+  ctx.fillStyle = P.CYAN;
+  ctx.strokeStyle = P.BG;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(size / 2, 3);
@@ -208,6 +256,11 @@ export function MapView({ className }: { className?: string }) {
   const selectedVehicleIdRef = useRef<string | null>(null);
   const selectedRegionIdRef = useRef<string | null>(null);
   const legRef = useRef<VehicleLeg | null>(null);
+  /** Which physical road the selected vehicle is on, and where along it. */
+  const roadMatchRef = useRef<RoadMatch | null>(null);
+  /** A road fetched at runtime because the vehicle matched none we hold. */
+  const liveRouteRef = useRef<[number, number][] | null>(null);
+  const roadsRef = useRef<RoadNetwork | null>(null);
   const packageBboxRef = useRef<BBox | null>(null);
   const packagePulseRef = useRef<[number, number] | null>(null);
   const followRef = useRef(false);
@@ -234,11 +287,18 @@ export function MapView({ className }: { className?: string }) {
   const setFollowVehicle = useControlTowerStore((s) => s.setFollowVehicle);
   const clearSelection = useControlTowerStore((s) => s.clearSelection);
   const vehicles = useControlTowerStore((s) => s.vehicles);
+  const roads = useRoads();
 
+  const theme = useTheme();
+  // Resolved once per mount. The map is remounted on a theme change (see
+  // MapViewLoader), so these stay correct without restyling every layer.
+  const [P] = useState(mapPalette);
+  const { CYAN, CYAN_DEEP, BLUE, EMERALD, AMBER, ROSE, INK, BG, LINE, LINE_SOFT } = P;
   const [loadState, setLoadState] = useState<{ status: "loading" | "ready" | "error"; message?: string }>({ status: "loading" });
   const [tooltip, setTooltip] = useState<Tooltip | null>(null);
   const [focusRegion, setFocusRegion] = useState<RegionFeature["properties"] | null>(null);
   const [mapReadyTick, setMapReadyTick] = useState(0);
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
 
   const applyCamera = (map: MapLibreMap) => {
     const s = useControlTowerStore.getState();
@@ -299,15 +359,65 @@ export function MapView({ className }: { className?: string }) {
     const s = useControlTowerStore.getState();
     const sel = s.selectedVehicle;
     const live = sel ? s.vehicles.get(sel.id) : undefined;
-    legRef.current =
+    const leg =
       sel && live
         ? inferVehicleLeg(
             { lat: live.latitude, lon: live.longitude, heading: live.heading, speed: live.speed, status: live.status },
             live.current_node_id ?? sel.current_node_id,
             routesRef.current,
             nodesByIdRef.current,
+            live.destination_node_id,
           )
         : null;
+    legRef.current = leg;
+    matchRoadForLeg(leg, live ? { lat: live.latitude, lon: live.longitude } : null);
+  };
+
+  /**
+   * Work out which road the vehicle is actually driving.
+   *
+   * The corridor may have more than one sensible road, and a driver taking the
+   * long way is exactly the thing an operator wants to see, so rather than
+   * trusting a flag the position is projected onto every road known for the
+   * leg and the closest wins. Off all of them by more than OFF_ROUTE_M, the
+   * vehicle is on a road not in the shipped file, and the actual road is
+   * fetched once and drawn instead.
+   */
+  const matchRoadForLeg = (leg: VehicleLeg | null, at: LatLon | null) => {
+    const roadNetwork = roadsRef.current;
+    if (!leg || !at || !roadNetwork) {
+      roadMatchRef.current = null;
+      liveRouteRef.current = null;
+      setRouteInfo(null);
+      return;
+    }
+    const from = { lat: leg.source.latitude, lon: leg.source.longitude };
+    const to = { lat: leg.dest.latitude, lon: leg.dest.longitude };
+    const variants = roadNetwork.variants(from, to);
+    const match = matchRoad(variants, at.lon, at.lat);
+
+    if (match && match.offsetM <= OFF_ROUTE_M) {
+      roadMatchRef.current = match;
+      liveRouteRef.current = null;
+      const fastest = variants[0];
+      const extraKm = fastest ? match.variant.distanceKm - fastest.distanceKm : 0;
+      const extraMin = fastest ? match.variant.durationMin - fastest.durationMin : 0;
+      setRouteInfo({
+        kind: match.variant.name === "primary" ? "fastest" : "alternative",
+        remainingKm: roadRemainingKm(match.variant, match.progress),
+        extraKm,
+        extraMin,
+        destination: leg.dest.node_name,
+      });
+      return;
+    }
+
+    // Not on any road we hold: ask what road it is on, once.
+    roadMatchRef.current = null;
+    setRouteInfo({ kind: "off-route", remainingKm: leg.remainingKm, extraKm: 0, extraMin: 0, destination: leg.dest.node_name });
+    void fetchLiveRoute(at, to).then((geometry) => {
+      liveRouteRef.current = geometry;
+    });
   };
 
   const revealIfReady = (map: MapLibreMap) => {
@@ -326,11 +436,16 @@ export function MapView({ className }: { className?: string }) {
     if (!containerRef.current || mapRef.current) return;
     useControlTowerStore.getState().loadRegions();
 
+    // Restoring a remembered camera means a theme switch (which remounts the
+    // map) lands exactly where the operator left off, and skips the intro.
+    const restored = lastCamera;
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: BASEMAP_STYLE,
-      center: COUNTRY.center,
-      zoom: INTRO_START_ZOOM,
+      style: BASEMAP_STYLE[theme],
+      center: restored?.center ?? COUNTRY.center,
+      zoom: restored?.zoom ?? INTRO_START_ZOOM,
+      bearing: restored?.bearing ?? 0,
+      pitch: restored?.pitch ?? 0,
       attributionControl: false,
     });
     mapRef.current = map;
@@ -364,7 +479,7 @@ export function MapView({ className }: { className?: string }) {
 
     map.on("load", () => {
       clearTimeout(stallTimer);
-      map.addImage("vehicle-arrow", buildVehicleArrowIcon(), { pixelRatio: 2 });
+      map.addImage("vehicle-arrow", buildVehicleArrowIcon(P), { pixelRatio: 2 });
       const labelLayer = map.getStyle().layers.find((l) => l.type === "symbol")?.id;
       const loadedRegions = useControlTowerStore.getState().regions;
       const hover: ExpressionSpecification = ["boolean", ["feature-state", "hover"], false];
@@ -413,6 +528,17 @@ export function MapView({ className }: { className?: string }) {
 
       map.addSource("vehicle-trail", { type: "geojson", data: EMPTY_FC, lineMetrics: true });
       map.addLayer({ id: "vehicle-trail", type: "line", source: "vehicle-trail", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-width": 4, "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0, "rgba(34,211,238,0)", 1, "rgba(34,211,238,0.85)"] } });
+      // The full road the selected vehicle is driving, drawn under the
+      // remaining-leg line so the chosen route is visible end to end.
+      map.addSource("vehicle-road", { type: "geojson", data: EMPTY_FC });
+      map.addLayer({
+        id: "vehicle-road", type: "line", source: "vehicle-road",
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": ["case", ["boolean", ["get", "detour"], false], AMBER, CYAN_DEEP],
+          "line-width": 5, "line-opacity": 0.35, "line-blur": 0.5,
+        },
+      });
       map.addSource("vehicle-leg", { type: "geojson", data: EMPTY_FC });
       map.addLayer({ id: "vehicle-leg", type: "line", source: "vehicle-leg", paint: { "line-color": CYAN, "line-width": 2.5, "line-dasharray": DASH_SEQUENCE[0], "line-opacity": 0.85 } });
 
@@ -506,11 +632,20 @@ export function MapView({ className }: { className?: string }) {
         setFocus(findRegionAt(s.regions.district, c.lng, c.lat));
       });
 
-      map.flyTo({ center: COUNTRY.center, zoom: COUNTRY.overviewZoom, duration: INTRO_DURATION_MS, essential: true });
-      flightUntilRef.current = performance.now() + INTRO_DURATION_MS + 100;
-      map.once("moveend", () => {
+      if (restored) {
         flightDoneRef.current = true;
         revealIfReady(map);
+      } else {
+        map.flyTo({ center: COUNTRY.center, zoom: COUNTRY.overviewZoom, duration: INTRO_DURATION_MS, essential: true });
+        flightUntilRef.current = performance.now() + INTRO_DURATION_MS + 100;
+        map.once("moveend", () => {
+          flightDoneRef.current = true;
+          revealIfReady(map);
+        });
+      }
+      map.on("moveend", () => {
+        const c = map.getCenter();
+        lastCamera = { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() };
       });
       mapReadyRef.current = true;
 
@@ -547,9 +682,10 @@ export function MapView({ className }: { className?: string }) {
     });
     nodesByIdRef.current = derived.nodesById;
     routesRef.current = derived.routes;
+    roadsRef.current = roads;
     const risk = riskByNode(derived);
     (map.getSource("nodes") as GeoJSONSource).setData(nodesToGeoJSON(nodes, risk));
-    (map.getSource("routes") as GeoJSONSource).setData(routesToGeoJSON(derived.routes, derived.nodesById));
+    (map.getSource("routes") as GeoJSONSource).setData(routesToGeoJSON(derived.routes, derived.nodesById, roadsRef.current));
     (map.getSource("riders") as GeoJSONSource).setData(
       fc(
         derived.riders
@@ -568,7 +704,7 @@ export function MapView({ className }: { className?: string }) {
     recomputeLeg();
     revealIfReady(map);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [derived, filters, cross, mapReadyTick]);
+  }, [derived, filters, cross, mapReadyTick, roads]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -592,12 +728,14 @@ export function MapView({ className }: { className?: string }) {
     }
     if (layers.boundaries) applyRegionVisuals(map);
      
-  }, [layers, mapReadyTick]);
+  }, [layers, mapReadyTick, LINE_SOFT, EMERALD, AMBER, ROSE]);
 
   useEffect(() => {
     selectedVehicleIdRef.current = selectedVehicle?.id ?? null;
     recomputeLeg();
-     
+    // recomputeLeg reads refs and the store at call time, so it is deliberately
+    // not a dependency: listing it would re-run this on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedVehicle]);
   useEffect(() => {
     followRef.current = followVehicle;
@@ -643,7 +781,8 @@ export function MapView({ className }: { className?: string }) {
       }
     }
     recomputeLeg();
-     
+    // See the note above: recomputeLeg is call-time, not render-time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicles]);
 
   // Package path.
@@ -657,29 +796,43 @@ export function MapView({ className }: { className?: string }) {
     if (pkg) {
       const src = nodesById.get(pkg.source_node_id);
       const dst = nodesById.get(pkg.destination_node_id);
-      const seen: [number, number][] = [];
-      if (src) seen.push([src.longitude, src.latitude]);
+      // Scan points are stops, not a path: joining them directly draws a
+      // parcel straight across rivers it was actually driven around, so the
+      // stops are stitched together along the roads between them.
+      const stops: LatLon[] = [];
+      const pushStop = (lon: number, lat: number) => {
+        const last = stops[stops.length - 1];
+        if (!last || last.lon !== lon || last.lat !== lat) stops.push({ lat, lon });
+      };
+      if (src) pushStop(src.longitude, src.latitude);
       for (const step of pkg.timeline) {
         if (step.latitude == null || step.longitude == null) continue;
-        const last = seen[seen.length - 1];
-        if (!last || last[0] !== step.longitude || last[1] !== step.latitude) seen.push([step.longitude, step.latitude]);
+        pushStop(step.longitude, step.latitude);
       }
-      traveled = seen;
-      const last = seen[seen.length - 1];
-      if (dst && last && (last[0] !== dst.longitude || last[1] !== dst.latitude)) remaining = [last, [dst.longitude, dst.latitude]];
+      const roadNetwork = roadsRef.current;
+      traveled = roadNetwork ? roadNetwork.chain(stops) : stops.map((p) => [p.lon, p.lat] as [number, number]);
+      const lastStop = stops[stops.length - 1];
+      if (dst && lastStop && (lastStop.lon !== dst.longitude || lastStop.lat !== dst.latitude)) {
+        const to = { lat: dst.latitude, lon: dst.longitude };
+        remaining = roadNetwork ? roadNetwork.line(lastStop, to) : [[lastStop.lon, lastStop.lat], [dst.longitude, dst.latitude]];
+      }
       if (src) endpoints.push(pointFeature(src.longitude, src.latitude, { role: "origin", label: `Origin · ${src.node_name}` }));
       if (dst) endpoints.push(pointFeature(dst.longitude, dst.latitude, { role: "destination", label: `Destination · ${dst.node_name}` }));
       const current = pkg.current_node_id ? nodesById.get(pkg.current_node_id) : undefined;
-      pulse = current ? [current.longitude, current.latitude] : (last ?? null);
+      pulse = current
+        ? [current.longitude, current.latitude]
+        : lastStop
+          ? [lastStop.lon, lastStop.lat]
+          : null;
     }
     packageBboxRef.current = bboxOfPositions([...traveled, ...remaining]);
     packagePulseRef.current = pulse;
     const map = mapRef.current;
     if (!map || !mapReadyRef.current || !map.getSource("package-traveled")) return;
     (map.getSource("package-traveled") as GeoJSONSource).setData(traveled.length >= 2 ? fc([lineFeature(traveled)]) : EMPTY_FC);
-    (map.getSource("package-remaining") as GeoJSONSource).setData(remaining.length === 2 ? fc([lineFeature(remaining)]) : EMPTY_FC);
+    (map.getSource("package-remaining") as GeoJSONSource).setData(remaining.length >= 2 ? fc([lineFeature(remaining)]) : EMPTY_FC);
     (map.getSource("package-endpoints") as GeoJSONSource).setData(fc(endpoints));
-  }, [trackedPackage, derived]);
+  }, [trackedPackage, derived, roads]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -722,19 +875,36 @@ export function MapView({ className }: { className?: string }) {
         vehicleSource.setData(fc(features));
         const trailSource = map.getSource("vehicle-trail") as GeoJSONSource | undefined;
         const legSource = map.getSource("vehicle-leg") as GeoJSONSource | undefined;
+        const roadSource = map.getSource("vehicle-road") as GeoJSONSource | undefined;
         const pulseSource = map.getSource("pulses") as GeoJSONSource | undefined;
         const leg = legRef.current;
         const pulses: GeoJSON.Feature[] = [];
         if (selId && selPos) {
           const trail = trailsRef.current.get(selId) ?? [];
           trailSource?.setData(trail.length > 0 ? fc([lineFeature([...trail, selPos])]) : EMPTY_FC);
-          legSource?.setData(leg ? fc([lineFeature([selPos, [leg.dest.longitude, leg.dest.latitude]])]) : EMPTY_FC);
+          // Remaining distance follows the road being driven; only when no
+          // road is known at all does it fall back to the direct line.
+          const match = roadMatchRef.current;
+          const liveRoute = liveRouteRef.current;
+          if (match) {
+            const { ahead } = splitRoad(match.variant, match.progress, selPos);
+            const detour = match.variant.name !== "primary";
+            roadSource?.setData(fc([lineFeature(match.variant.geometry, { detour })]));
+            legSource?.setData(fc([lineFeature(ahead, { detour })]));
+          } else if (liveRoute) {
+            roadSource?.setData(fc([lineFeature(liveRoute, { detour: true })]));
+            legSource?.setData(fc([lineFeature(liveRoute, { detour: true })]));
+          } else {
+            roadSource?.setData(EMPTY_FC);
+            legSource?.setData(leg ? fc([lineFeature([selPos, [leg.dest.longitude, leg.dest.latitude]])]) : EMPTY_FC);
+          }
           pulses.push(pointFeature(selPos[0], selPos[1], { kind: "vehicle" }));
           if (leg) pulses.push(pointFeature(leg.dest.longitude, leg.dest.latitude, { kind: "dest" }));
           hadTracking = true;
         } else if (hadTracking) {
           trailSource?.setData(EMPTY_FC);
           legSource?.setData(EMPTY_FC);
+          roadSource?.setData(EMPTY_FC);
           hadTracking = false;
         }
         if (packagePulseRef.current) pulses.push(pointFeature(packagePulseRef.current[0], packagePulseRef.current[1], { kind: "package" }));
@@ -807,6 +977,32 @@ export function MapView({ className }: { className?: string }) {
         </div>
       )}
 
+      {routeInfo && selectedVehicle && (
+        <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 px-4">
+          <div
+            className={clsx(
+              "flex items-center gap-2 rounded-full border bg-nv-900/90 px-3 py-1.5 text-xs shadow-[var(--shadow-md)] backdrop-blur",
+              routeInfo.kind === "fastest" ? "border-nv-700 text-ink-600" : "border-amber-500/50 text-amber-300",
+            )}
+          >
+            <Route className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {routeInfo.kind === "fastest" && (
+              <span>
+                On the fastest road · <span className="font-semibold text-ink-900">{routeInfo.remainingKm.toFixed(1)} km</span> to {routeInfo.destination}
+              </span>
+            )}
+            {routeInfo.kind === "alternative" && (
+              <span>
+                Taking the longer road · +{routeInfo.extraKm.toFixed(1)} km, +{Math.round(routeInfo.extraMin)} min · {routeInfo.remainingKm.toFixed(1)} km to {routeInfo.destination}
+              </span>
+            )}
+            {routeInfo.kind === "off-route" && (
+              <span>Off the mapped corridor · matching the road being driven</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <MapControls
         onZoomIn={() => mapRef.current?.zoomIn({ duration: 350 })}
         onZoomOut={() => mapRef.current?.zoomOut({ duration: 350 })}
@@ -833,7 +1029,7 @@ export function MapView({ className }: { className?: string }) {
         </div>
       )}
       {loadState.status === "loading" && !errorMessage && (
-        <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2">
+        <div className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2">
           <div className="flex items-center gap-2 rounded-full border border-nv-700 bg-nv-900/80 px-3 py-1.5 text-xs text-ink-600 backdrop-blur">
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
             Loading network…

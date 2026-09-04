@@ -13,7 +13,7 @@ export function Card({ className, interactive, selected, ...props }: CardProps) 
     <div
       className={clsx(
         "rounded-lg border bg-nv-900 shadow-[var(--shadow-sm)] transition-colors",
-        selected ? "border-accent-500/70 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]" : "border-nv-800",
+        selected ? "border-accent-500/70 shadow-[0_0_0_1px_color-mix(in_oklab,var(--primary)_35%,transparent)]" : "border-nv-800",
         interactive && "cursor-pointer hover:border-nv-600 hover:bg-nv-850/60",
         className,
       )}

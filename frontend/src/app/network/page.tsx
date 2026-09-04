@@ -55,7 +55,7 @@ function Network() {
       .sort((a, b) => b.demand - a.demand)
       .filter(({ r }) => { const k = `${cityOf(r.source_node_id)}|${cityOf(r.destination_node_id)}`; if (seen.has(k)) return false; seen.add(k); return true; })
       .slice(0, 10)
-      .map(({ r, demand }) => ({ key: r.id, label: `${cityOf(r.source_node_id)} → ${cityOf(r.destination_node_id)}`, value: demand, secondary: `${r.distance_km.toFixed(0)} km · ${Math.round(r.congestion_level * 100)}%`, color: r.congestion_level >= 0.8 ? "#f87171" : r.congestion_level >= 0.6 ? "#fbbf24" : "#22d3ee" }));
+      .map(({ r, demand }) => ({ key: r.id, label: `${cityOf(r.source_node_id)} → ${cityOf(r.destination_node_id)}`, value: demand, secondary: `${r.distance_km.toFixed(0)} km · ${Math.round(r.congestion_level * 100)}%`, color: r.congestion_level >= 0.8 ? "danger" : r.congestion_level >= 0.6 ? "warning" : "accent" }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [derived.routes, shipments]);
 
@@ -72,7 +72,7 @@ function Network() {
       [...derived.routes]
         .filter((r) => r.congestion_level >= 0.5 || r.route_status !== "ACTIVE")
         .sort((a, b) => b.congestion_level - a.congestion_level)
-        .map((r) => ({ key: r.id, label: `${cityOf(r.source_node_id)} → ${cityOf(r.destination_node_id)}`, value: r.congestion_level * 100, display: `${Math.round(r.congestion_level * 100)}%`, secondary: `+${r.current_travel_time - r.estimated_travel_time} min · ${r.active_package_count} parcels`, color: r.congestion_level >= 0.8 ? "#f87171" : "#fbbf24" })),
+        .map((r) => ({ key: r.id, label: `${cityOf(r.source_node_id)} → ${cityOf(r.destination_node_id)}`, value: r.congestion_level * 100, display: `${Math.round(r.congestion_level * 100)}%`, secondary: `+${r.current_travel_time - r.estimated_travel_time} min · ${r.active_package_count} parcels`, color: r.congestion_level >= 0.8 ? "danger" : "warning" })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [derived.routes],
   );
@@ -83,7 +83,7 @@ function Network() {
         .map((r) => ({ r, cost: r.distance_km * FINANCE.linehaulPerKm * Math.max(1, r.active_package_count) }))
         .sort((a, b) => b.cost - a.cost)
         .slice(0, 10)
-        .map(({ r, cost }) => ({ key: r.id, label: `${cityOf(r.source_node_id)} → ${cityOf(r.destination_node_id)}`, value: cost, display: formatBDT(cost, true), secondary: `${formatBDT(r.distance_km * FINANCE.linehaulPerKm)}/parcel`, color: "#a78bfa" })),
+        .map(({ r, cost }) => ({ key: r.id, label: `${cityOf(r.source_node_id)} → ${cityOf(r.destination_node_id)}`, value: cost, display: formatBDT(cost, true), secondary: `${formatBDT(r.distance_km * FINANCE.linehaulPerKm)}/parcel`, color: "ai" })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [derived.routes],
   );
@@ -176,7 +176,7 @@ function Network() {
           {panel === "capacity" && (
             <>
               <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-ink-500">Hub capacity · click for detail</div>
-              <BarList rows={[...derived.hubs].sort((a, b) => b.utilization - a.utilization).map((h) => ({ key: h.id, label: h.name, value: h.utilization * 100, display: `${Math.round(h.utilization * 100)}%`, secondary: `${formatNumber(h.load)} / ${formatNumber(h.capacity)}`, color: h.health === "critical" ? "#f87171" : h.health === "warning" ? "#fbbf24" : "#34d399" }))} max={100} onClick={(k) => open("hub", k)} />
+              <BarList rows={[...derived.hubs].sort((a, b) => b.utilization - a.utilization).map((h) => ({ key: h.id, label: h.name, value: h.utilization * 100, display: `${Math.round(h.utilization * 100)}%`, secondary: `${formatNumber(h.load)} / ${formatNumber(h.capacity)}`, color: h.health === "critical" ? "danger" : h.health === "warning" ? "warning" : "good" }))} max={100} onClick={(k) => open("hub", k)} />
             </>
           )}
           {panel === "bottlenecks" && (

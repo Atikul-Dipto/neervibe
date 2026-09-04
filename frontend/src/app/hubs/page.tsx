@@ -11,7 +11,7 @@ import { StatusPill, genericStatusTone } from "@/components/ui/StatusPill";
 import { ChartCard } from "@/components/charts/ChartCard";
 import { BarList } from "@/components/charts/BarList";
 import { TrendChart } from "@/components/charts/TrendChart";
-import { HEALTH_COLORS } from "@/components/charts/chartTheme";
+import { useChartTheme } from "@/components/charts/chartTheme";
 import { EmptyState } from "@/components/ui/States";
 import { useOpenDrawer } from "@/data/hooks";
 import { useDrawerStore } from "@/data/drawer";
@@ -28,6 +28,7 @@ export default function HubsPage() {
 }
 
 function Hubs() {
+  const chart = useChartTheme();
   const { derived, filters, cross } = usePageData();
   const open = useOpenDrawer();
   const drawerItem = useDrawerStore((s) => s.item);
@@ -89,10 +90,10 @@ function Hubs() {
 
       <div className="mt-3 grid gap-3 xl:grid-cols-2">
         <ChartCard title="Hub comparison" subtitle="Inbound, pending and outbound parcels" empty={flow.length === 0}>
-          <TrendChart data={flow} xKey="name" height={220} series={[{ key: "inbound", label: "Inbound", color: "#22d3ee", kind: "bar", stackId: "a" }, { key: "pending", label: "Pending", color: "#fbbf24", kind: "bar", stackId: "a" }, { key: "outbound", label: "Outbound", color: "#34d399", kind: "bar", stackId: "a" }]} />
+          <TrendChart data={flow} xKey="name" height={220} series={[{ key: "inbound", label: "Inbound", color: "accent", kind: "bar", stackId: "a" }, { key: "pending", label: "Pending", color: "warning", kind: "bar", stackId: "a" }, { key: "outbound", label: "Outbound", color: "good", kind: "bar", stackId: "a" }]} />
         </ChartCard>
         <ChartCard title="Utilisation ranking" subtitle="Click for detail" empty={sorted.length === 0}>
-          <BarList rows={sorted.slice(0, 12).map((h) => ({ key: h.id, label: h.name, value: h.utilization * 100, display: `${Math.round(h.utilization * 100)}%`, secondary: h.city, color: HEALTH_COLORS[h.health] }))} max={100} onClick={(k) => open("hub", k)} activeKey={drawerItem?.kind === "hub" ? drawerItem.id : null} />
+          <BarList rows={sorted.slice(0, 12).map((h) => ({ key: h.id, label: h.name, value: h.utilization * 100, display: `${Math.round(h.utilization * 100)}%`, secondary: h.city, color: chart.health[h.health] }))} max={100} onClick={(k) => open("hub", k)} activeKey={drawerItem?.kind === "hub" ? drawerItem.id : null} />
         </ChartCard>
       </div>
       <p className="mt-2 text-[10px] text-ink-500">

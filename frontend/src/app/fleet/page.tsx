@@ -18,6 +18,7 @@ import { useDrawerStore } from "@/data/drawer";
 import { useControlTowerStore } from "@/store/useControlTowerStore";
 import { useFilterStore, effectiveLists } from "@/data/filters";
 import { inferVehicleLeg } from "@/components/map/geo";
+import { roadRemainingFrom, useRoads } from "@/components/map/roads";
 import { formatMinutes, formatPct, formatRelative, humanize } from "@/data/format";
 import type { Vehicle, VehicleLiveUpdate } from "@/types/domain";
 
@@ -31,7 +32,11 @@ interface FleetRow {
   weight: number;
   utilization: number;
   nextStop: string | null;
+  /** Road distance still to drive, km. Null when the vehicle is not en route. */
+  remainingKm: number | null;
   eta: number | null;
+  /** True when the vehicle is on the corridor's longer road, not the fastest. */
+  detour: boolean;
   speed: number;
   updatedAt: string;
 }
@@ -60,6 +65,7 @@ function Fleet() {
     return () => setLayer("riders", true);
   }, [setLayer]);
 
+  const roads = useRoads();
   const rows = useMemo<FleetRow[]>(() => {
     return derived.vehicles
       .filter((v) => !lists.vehicles.length || lists.vehicles.includes(v.id))
@@ -68,7 +74,11 @@ function Fleet() {
         const driver = derived.riders.find((r) => r.rider.vehicle_id === v.id) ?? null;
         const load = derived.shipments.filter((s) => s.isActive && s.pkg.assigned_vehicle_id === v.id);
         const weight = load.reduce((sum, s) => sum + s.pkg.package_weight, 0);
-        const leg = live ? inferVehicleLeg({ lat: live.latitude, lon: live.longitude, heading: live.heading, speed: live.speed, status: live.status }, live.current_node_id ?? v.current_node_id, derived.routes, derived.nodesById) : null;
+        const leg = live ? inferVehicleLeg({ lat: live.latitude, lon: live.longitude, heading: live.heading, speed: live.speed, status: live.status }, live.current_node_id ?? v.current_node_id, derived.routes, derived.nodesById, live.destination_node_id) : null;
+        // Along the road being driven where geometry exists; the direct line
+        // only where it does not.
+        const onRoad = leg && live ? roadRemainingFrom(roads, { lat: leg.source.latitude, lon: leg.source.longitude }, { lat: live.latitude, lon: live.longitude }, { lat: leg.dest.latitude, lon: leg.dest.longitude }) : null;
+        const legKm = onRoad?.km ?? leg?.remainingKm ?? null;
         const dest = live?.destination_node_id ? derived.nodesById.get(live.destination_node_id) : leg?.dest;
         const node = derived.nodesById.get(live?.current_node_id ?? v.current_node_id ?? "");
         return {
@@ -81,14 +91,16 @@ function Fleet() {
           weight,
           utilization: v.capacity ? weight / v.capacity : 0,
           nextStop: dest?.node_name ?? null,
-          eta: leg?.etaMinutes ?? null,
+          remainingKm: legKm,
+          eta: legKm != null && live && live.speed > 1 ? (legKm / live.speed) * 60 : (leg?.etaMinutes ?? null),
+          detour: onRoad != null && onRoad.variant.name !== "primary",
           speed: live?.speed ?? v.speed,
           updatedAt: live?.timestamp ?? v.updated_at,
           city: node?.city,
         } as FleetRow & { city?: string };
       })
       .filter((r) => !lists.cities.length || (r as FleetRow & { city?: string }).city == null || lists.cities.includes((r as FleetRow & { city?: string }).city!));
-  }, [derived, liveVehicles, lists.vehicles, lists.cities]);
+  }, [derived, liveVehicles, lists.vehicles, lists.cities, roads]);
 
   const enRoute = rows.filter((r) => r.status === "EN_ROUTE").length;
   const idle = rows.filter((r) => r.status === "IDLE").length;
@@ -116,7 +128,19 @@ function Fleet() {
         ),
         value: (r) => r.utilization,
       },
-      { key: "next", header: "Next stop", cell: (r) => <span className="text-ink-600">{r.nextStop ?? "—"}{r.eta != null && <span className="text-ink-500"> · {formatMinutes(r.eta)}</span>}</span>, value: (r) => r.nextStop ?? "" },
+      {
+        key: "next",
+        header: "Next stop",
+        cell: (r) => (
+          <span className="text-ink-600">
+            {r.nextStop ?? "—"}
+            {r.remainingKm != null && <span className="text-ink-500"> · {r.remainingKm.toFixed(1)} km</span>}
+            {r.eta != null && <span className="text-ink-500"> · {formatMinutes(r.eta)}</span>}
+            {r.detour && <span className="text-amber-300"> · longer road</span>}
+          </span>
+        ),
+        value: (r) => r.nextStop ?? "",
+      },
       { key: "capacity", header: "Capacity", align: "right", defaultHidden: true, cell: (r) => <span className="text-ink-600">{r.v.capacity.toFixed(0)} kg</span>, value: (r) => r.v.capacity },
       { key: "updated", header: "Last update", cell: (r) => <span className="text-ink-500">{formatRelative(r.updatedAt)}</span>, value: (r) => Date.parse(r.updatedAt) },
     ],
@@ -144,7 +168,7 @@ function Fleet() {
             <MapViewLoader />
           </Card>
           <ChartCard title="Fleet mix" subtitle="Vehicles by type" empty={rows.length === 0}>
-            <DonutChart slices={[...byType.entries()].map(([t, n], i) => ({ key: t, label: humanize(t), value: n, color: ["#22d3ee", "#60a5fa", "#a78bfa", "#34d399", "#fbbf24"][i % 5] }))} centerValue={String(rows.length)} centerLabel="vehicles" height={130} />
+            <DonutChart slices={[...byType.entries()].map(([t, n], i) => ({ key: t, label: humanize(t), value: n, color: ["accent", "info", "ai", "good", "warning"][i % 5] }))} centerValue={String(rows.length)} centerLabel="vehicles" height={130} />
           </ChartCard>
         </div>
       </div>
@@ -155,7 +179,7 @@ function Fleet() {
             rows={[...rows]
               .sort((a, b) => b.utilization - a.utilization)
               .slice(0, 10)
-              .map((r) => ({ key: r.v.id, label: r.v.registration_number, value: r.utilization * 100, display: `${Math.round(r.utilization * 100)}%`, secondary: `${humanize(r.status)} · ${r.load} parcels`, color: r.utilization > 0.9 ? "#f87171" : r.utilization < 0.2 ? "#fbbf24" : "#22d3ee" }))}
+              .map((r) => ({ key: r.v.id, label: r.v.registration_number, value: r.utilization * 100, display: `${Math.round(r.utilization * 100)}%`, secondary: `${humanize(r.status)} · ${r.load} parcels`, color: r.utilization > 0.9 ? "danger" : r.utilization < 0.2 ? "warning" : "accent" }))}
             max={100}
             onClick={(k) => open("vehicle", k)}
           />

@@ -51,7 +51,7 @@ function Finance() {
   const byService = DELIVERY_TYPES.map((t) => {
     const list = shipments.filter((s) => s.pkg.delivery_type === t);
     const f = financeFor(list, now);
-    return { key: t, label: humanize(t), value: f.margin, display: formatBDT(f.margin, true), secondary: `${list.length} shipments · ${formatPct(f.marginPct, 0)} margin`, color: f.margin >= 0 ? "#34d399" : "#f87171" };
+    return { key: t, label: humanize(t), value: f.margin, display: formatBDT(f.margin, true), secondary: `${list.length} shipments · ${formatPct(f.marginPct, 0)} margin`, color: f.margin >= 0 ? "good" : "danger" };
   }).filter((x) => x.value !== 0 || shipments.some((s) => s.pkg.delivery_type === x.key));
 
   const byCity = useMemo(() => {
@@ -59,7 +59,7 @@ function Finance() {
     for (const s of shipments) cities.set(s.city, [...(cities.get(s.city) ?? []), s]);
     return [...cities.entries()].map(([city, list]) => {
       const f = financeFor(list, now);
-      return { key: city, label: city, value: f.marginPct ?? 0, display: formatPct(f.marginPct, 0), secondary: `${formatBDT(f.revenue, true)} revenue`, color: (f.marginPct ?? 0) < 0 ? "#f87171" : (f.marginPct ?? 0) < 20 ? "#fbbf24" : "#34d399" };
+      return { key: city, label: city, value: f.marginPct ?? 0, display: formatPct(f.marginPct, 0), secondary: `${formatBDT(f.revenue, true)} revenue`, color: (f.marginPct ?? 0) < 0 ? "danger" : (f.marginPct ?? 0) < 20 ? "warning" : "good" };
     }).sort((a, b) => b.value - a.value);
   }, [shipments, now]);
 
@@ -93,10 +93,10 @@ function Finance() {
 
       <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <ChartCard title="COD funnel" subtitle="Generated → collected → settled" empty={fin.codGenerated === 0}>
-          <SegmentBar segments={[{ key: "settled", label: "Settled", value: fin.codSettled, color: "#34d399" }, { key: "outstanding", label: "Collected, unsettled", value: fin.codOutstanding, color: "#22d3ee" }, { key: "pending", label: "Pending", value: fin.codPending, color: "#fbbf24" }, { key: "lost", label: "Not collectable", value: Math.max(0, fin.codGenerated - fin.codCollected - fin.codPending), color: "#64748b" }]} />
+          <SegmentBar segments={[{ key: "settled", label: "Settled", value: fin.codSettled, color: "good" }, { key: "outstanding", label: "Collected, unsettled", value: fin.codOutstanding, color: "accent" }, { key: "pending", label: "Pending", value: fin.codPending, color: "warning" }, { key: "lost", label: "Not collectable", value: Math.max(0, fin.codGenerated - fin.codCollected - fin.codPending), color: "muted" }]} />
         </ChartCard>
         <ChartCard title="Cost breakdown" subtitle="Where the delivery cost goes" empty={fin.cost === 0}>
-          <DonutChart slices={[{ key: "linehaul", label: "Line-haul (ex fuel)", value: fin.linehaulCost - fin.fuelCost, color: "#22d3ee" }, { key: "fuel", label: "Fuel", value: fin.fuelCost, color: "#60a5fa" }, { key: "rider", label: "Riders", value: fin.riderCost, color: "#a78bfa" }, { key: "hub", label: "Hub handling", value: fin.hubCost, color: "#fbbf24" }]} centerValue={formatBDT(fin.cost, true)} centerLabel="cost" height={140} />
+          <DonutChart slices={[{ key: "linehaul", label: "Line-haul (ex fuel)", value: fin.linehaulCost - fin.fuelCost, color: "accent" }, { key: "fuel", label: "Fuel", value: fin.fuelCost, color: "info" }, { key: "rider", label: "Riders", value: fin.riderCost, color: "ai" }, { key: "hub", label: "Hub handling", value: fin.hubCost, color: "warning" }]} centerValue={formatBDT(fin.cost, true)} centerLabel="cost" height={140} />
         </ChartCard>
         <ChartCard title="Profitability by service" subtitle="Margin by service type · click to filter" active={cross.active} activeLabel={cross.activeValue("serviceTypes") ? humanize(cross.activeValue("serviceTypes")) : undefined} empty={byService.length === 0}>
           <BarList rows={byService} max={Math.max(1, ...byService.map((x) => Math.abs(x.value)))} onClick={(k) => cross.toggle("serviceTypes", k, humanize(k))} activeKey={cross.activeValue("serviceTypes")} />
@@ -110,7 +110,7 @@ function Finance() {
         <DataTable columns={columns} rows={settlement} rowKey={(r) => r.m.id} onRowClick={(r) => open("merchant", r.m.id)} initialSort={{ key: "collected", dir: "desc" }} exportName="cod-settlement" emptyWhat="COD merchants" onClearFilters={clearAll} dense />
         <div className="space-y-3">
           <ChartCard title="Revenue vs cost" subtitle="Per day · revenue on creation, cost on delivery" empty={daily.length === 0}>
-            <TrendChart data={daily} xKey="date" xFormatter={formatDate} yFormatter={(v) => formatBDT(v, true)} height={200} series={[{ key: "revenue", label: "Revenue", color: "#22d3ee", kind: "area" }, { key: "cost", label: "Cost", color: "#f87171", kind: "line" }, { key: "codCollected", label: "COD collected", color: "#34d399", kind: "line", dashed: true }]} />
+            <TrendChart data={daily} xKey="date" xFormatter={formatDate} yFormatter={(v) => formatBDT(v, true)} height={200} series={[{ key: "revenue", label: "Revenue", color: "accent", kind: "area" }, { key: "cost", label: "Cost", color: "danger", kind: "line" }, { key: "codCollected", label: "COD collected", color: "good", kind: "line", dashed: true }]} />
           </ChartCard>
           <Card className="p-3 text-[11px] text-ink-600">
             <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-ink-900">

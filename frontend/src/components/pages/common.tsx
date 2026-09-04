@@ -15,7 +15,7 @@ import { SegmentBar } from "@/components/charts/SegmentBar";
 import { BarList } from "@/components/charts/BarList";
 import { TrendChart } from "@/components/charts/TrendChart";
 import { DonutChart } from "@/components/charts/DonutChart";
-import { STATUS_GROUP_COLORS, HEALTH_COLORS } from "@/components/charts/chartTheme";
+import { useChartTheme } from "@/components/charts/chartTheme";
 import { StatusPill, priorityTone } from "@/components/ui/StatusPill";
 import { ErrorState } from "@/components/ui/States";
 import { Skeleton, StatCardSkeleton } from "@/components/ui/Skeleton";
@@ -126,8 +126,9 @@ export function ShipmentKpiStrip({ shipments, previous, daily, mode = "cross" }:
 }
 
 export function StatusDistributionCard({ shipments, className }: { shipments: Shipment[]; className?: string }) {
+  const chart = useChartTheme();
   const cross = useCross("status-distribution");
-  const segments = STATUS_GROUPS.map((g) => ({ key: g.key, label: g.label, value: shipments.filter((s) => s.group === g.key).length, color: STATUS_GROUP_COLORS[g.key] }));
+  const segments = STATUS_GROUPS.map((g) => ({ key: g.key, label: g.label, value: shipments.filter((s) => s.group === g.key).length, color: chart.statusGroup[g.key] }));
   return (
     <ChartCard title="Delivery status distribution" subtitle="Click a segment to filter the page" active={cross.active} activeLabel={cross.activeValue("statusGroups") ?? undefined} empty={shipments.length === 0} className={className}>
       <SegmentBar segments={segments} onClick={(k) => cross.toggle("statusGroups", k, STATUS_GROUPS.find((g) => g.key === k)?.label ?? k)} activeKey={cross.activeValue("statusGroups")} />
@@ -156,7 +157,7 @@ export function CityPerformanceCard({ shipments, className, max = 10 }: { shipme
         label: city,
         value: c.total,
         secondary: `SLA ${formatPct(c.judged ? (c.met / c.judged) * 100 : null, 0)}${c.breached ? ` · ${c.breached} breached` : ""}`,
-        color: c.breached > 3 ? "#f87171" : c.breached > 0 ? "#fbbf24" : "#22d3ee",
+        color: c.breached > 3 ? "danger" : c.breached > 0 ? "warning" : "accent",
       }));
   }, [shipments, max]);
   return (
@@ -167,12 +168,13 @@ export function CityPerformanceCard({ shipments, className, max = 10 }: { shipme
 }
 
 export function HubLoadCard({ hubs, className, max = 8 }: { hubs: HubStats[]; className?: string; max?: number }) {
+  const chart = useChartTheme();
   const open = useOpenDrawer();
   const rows = [...hubs]
     .filter((h) => h.capacity > 0)
     .sort((a, b) => b.utilization - a.utilization)
     .slice(0, max)
-    .map((h) => ({ key: h.id, label: h.name, value: h.utilization * 100, display: `${Math.round(h.utilization * 100)}%`, secondary: `${h.pending.length} pending · ${h.city}`, color: HEALTH_COLORS[h.health] }));
+    .map((h) => ({ key: h.id, label: h.name, value: h.utilization * 100, display: `${Math.round(h.utilization * 100)}%`, secondary: `${h.pending.length} pending · ${h.city}`, color: chart.health[h.health] }));
   return (
     <ChartCard title="Hub load" subtitle="Capacity utilisation · click for hub detail" empty={rows.length === 0} className={className}>
       <BarList rows={rows} max={100} onClick={(k) => open("hub", k)} />
@@ -194,9 +196,9 @@ export function ShipmentTrendCard({ daily, className, height = 190 }: { daily: D
         onPointClick={(x) => setRange(x, x)}
         activeX={activeX}
         series={[
-          { key: "created", label: "Created", color: "#22d3ee", kind: "area" },
-          { key: "delivered", label: "Delivered", color: "#34d399", kind: "line" },
-          { key: "failed", label: "Failed attempts", color: "#f87171", kind: "bar" },
+          { key: "created", label: "Created", color: "accent", kind: "area" },
+          { key: "delivered", label: "Delivered", color: "good", kind: "line" },
+          { key: "failed", label: "Failed attempts", color: "danger", kind: "bar" },
         ]}
       />
     </ChartCard>
@@ -214,8 +216,8 @@ export function SlaTrendCard({ daily, className, height = 190 }: { daily: DayPoi
         xFormatter={formatDate}
         yFormatter={(v) => `${v}`}
         series={[
-          { key: "slaRate", label: "On-time %", color: "#34d399", kind: "line" },
-          { key: "late", label: "Late deliveries", color: "#f87171", kind: "bar", yAxisId: "right" },
+          { key: "slaRate", label: "On-time %", color: "good", kind: "line" },
+          { key: "late", label: "Late deliveries", color: "danger", kind: "bar", yAxisId: "right" },
         ]}
       />
     </ChartCard>
@@ -225,10 +227,10 @@ export function SlaTrendCard({ daily, className, height = 190 }: { daily: DayPoi
 export function RiderUtilizationCard({ riders, className }: { riders: RiderStats[]; className?: string }) {
   const drill = useDrill();
   const slices = [
-    { key: "normal", label: "Working", value: riders.filter((r) => r.workload === "normal").length, color: "#22d3ee" },
-    { key: "overloaded", label: "Overloaded", value: riders.filter((r) => r.workload === "overloaded").length, color: "#f87171" },
-    { key: "idle", label: "Idle", value: riders.filter((r) => r.workload === "idle").length, color: "#fbbf24" },
-    { key: "off_duty", label: "Off duty", value: riders.filter((r) => r.workload === "off_duty").length, color: "#64748b" },
+    { key: "normal", label: "Working", value: riders.filter((r) => r.workload === "normal").length, color: "accent" },
+    { key: "overloaded", label: "Overloaded", value: riders.filter((r) => r.workload === "overloaded").length, color: "danger" },
+    { key: "idle", label: "Idle", value: riders.filter((r) => r.workload === "idle").length, color: "warning" },
+    { key: "off_duty", label: "Off duty", value: riders.filter((r) => r.workload === "off_duty").length, color: "muted" },
   ];
   return (
     <ChartCard title="Rider utilisation" subtitle="Workforce state right now · click to open riders" empty={riders.length === 0} className={className}>

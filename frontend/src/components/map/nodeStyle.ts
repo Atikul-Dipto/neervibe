@@ -1,18 +1,22 @@
+import { cssVar } from "@/data/theme";
 import type { NodeType } from "@/types/domain";
 
-// Color-coded by node type — used for the map circle layer and the legend.
-// Kept restrained (no neon) per the "enterprise control center, not a game"
-// design rule.
-export const NODE_TYPE_COLORS: Record<NodeType, string> = {
-  MERCHANT: "#f59e0b",
-  PICKUP_POINT: "#eab308",
-  HUB: "#38bdf8",
-  SORTING_CENTER: "#818cf8",
-  REGIONAL_HUB: "#a78bfa",
-  DISTRIBUTION_CENTER: "#f472b6",
-  DELIVERY_HUB: "#34d399",
-  CUSTOMER: "#94a3b8",
-};
+// Node types are a categorical scale, so they come off the data-viz ramp in
+// globals.css rather than carrying their own colours — that way they follow the
+// theme and stay distinguishable on both grounds. Restrained by design: this is
+// an enterprise control centre, not a game.
+export function nodeTypeColors(): Record<NodeType, string> {
+  return {
+    MERCHANT: cssVar("--viz-5", "#c08a2e"),
+    PICKUP_POINT: cssVar("--tone-warn-300", "#8e6417"),
+    HUB: cssVar("--viz-2", "#4a7ba7"),
+    SORTING_CENTER: cssVar("--tone-info-600", "#345c80"),
+    REGIONAL_HUB: cssVar("--viz-3", "#7e68a8"),
+    DISTRIBUTION_CENTER: cssVar("--viz-8", "#b06a8c"),
+    DELIVERY_HUB: cssVar("--viz-1", "#689d4b"),
+    CUSTOMER: cssVar("--viz-7", "#7c8570"),
+  };
+}
 
 export const NODE_TYPE_RADIUS: Record<NodeType, number> = {
   MERCHANT: 4,
@@ -25,9 +29,10 @@ export const NODE_TYPE_RADIUS: Record<NodeType, number> = {
   CUSTOMER: 3,
 };
 
+/** Free-flowing → gridlocked, on the theme's good/warning/danger ramp. */
 export function congestionColor(level: number): string {
-  if (level < 0.3) return "#22c55e";
-  if (level < 0.6) return "#eab308";
-  if (level < 0.8) return "#f97316";
-  return "#ef4444";
+  if (level < 0.3) return cssVar("--tone-good-500", "#6d9145");
+  if (level < 0.6) return cssVar("--tone-warn-400", "#c08a2e");
+  if (level < 0.8) return cssVar("--tone-warn-500", "#b07c22");
+  return cssVar("--tone-bad-400", "#d96868");
 }

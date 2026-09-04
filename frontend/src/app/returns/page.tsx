@@ -50,7 +50,7 @@ function Returns() {
     const m = new Map<string, number>();
     for (const s of returns) for (const a of s.attempts) if (a.result !== "SUCCESS") m.set(a.result, (m.get(a.result) ?? 0) + 1);
     if (m.size === 0) for (const s of returns) m.set(s.status, (m.get(s.status) ?? 0) + 1);
-    return [...m.entries()].map(([k, v], i) => ({ key: k, label: humanize(k), value: v, color: ["#f87171", "#fbbf24", "#60a5fa", "#a78bfa"][i % 4] }));
+    return [...m.entries()].map(([k, v], i) => ({ key: k, label: humanize(k), value: v, color: ["danger", "warning", "info", "ai"][i % 4] }));
   }, [returns]);
 
   const byMerchant = useMemo(() => {
@@ -61,7 +61,7 @@ function Returns() {
       if (s.group === "returns") x.returns += 1;
       m.set(s.pkg.merchant_id, x);
     }
-    return [...m.entries()].filter(([, x]) => x.total >= 3).map(([id, x]) => ({ key: id, label: x.name, value: (x.returns / x.total) * 100, display: `${((x.returns / x.total) * 100).toFixed(0)}%`, secondary: `${x.returns} of ${x.total}`, color: x.returns / x.total > 0.1 ? "#f87171" : "#fbbf24" })).sort((a, b) => b.value - a.value).slice(0, 8);
+    return [...m.entries()].filter(([, x]) => x.total >= 3).map(([id, x]) => ({ key: id, label: x.name, value: (x.returns / x.total) * 100, display: `${((x.returns / x.total) * 100).toFixed(0)}%`, secondary: `${x.returns} of ${x.total}`, color: x.returns / x.total > 0.1 ? "danger" : "warning" })).sort((a, b) => b.value - a.value).slice(0, 8);
   }, [shipments]);
 
   const byCity = useMemo(() => {
@@ -72,13 +72,13 @@ function Returns() {
       if (s.group === "returns") x.returns += 1;
       m.set(s.city, x);
     }
-    return [...m.entries()].map(([city, x]) => ({ key: city, label: city, value: x.returns, secondary: `${formatPct(x.total ? (x.returns / x.total) * 100 : null, 0)} of ${x.total}`, color: "#fbbf24" })).sort((a, b) => b.value - a.value);
+    return [...m.entries()].map(([city, x]) => ({ key: city, label: city, value: x.returns, secondary: `${formatPct(x.total ? (x.returns / x.total) * 100 : null, 0)} of ${x.total}`, color: "warning" })).sort((a, b) => b.value - a.value);
   }, [shipments]);
 
   const byType = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of returns) m.set(s.pkg.package_type, (m.get(s.pkg.package_type) ?? 0) + 1);
-    return [...m.entries()].map(([k, v], i) => ({ key: k, label: humanize(k), value: v, color: ["#22d3ee", "#60a5fa", "#a78bfa", "#34d399", "#fbbf24", "#f87171"][i % 6] }));
+    return [...m.entries()].map(([k, v], i) => ({ key: k, label: humanize(k), value: v, color: ["accent", "info", "ai", "good", "warning", "danger"][i % 6] }));
   }, [returns]);
 
   const columns = useMemo<DataColumn<Shipment>[]>(
@@ -127,7 +127,7 @@ function Returns() {
       <div className="mt-3 grid gap-3 xl:grid-cols-[1fr_380px]">
         <DataTable columns={columns} rows={returns} rowKey={(s) => s.id} onRowClick={(s) => open("shipment", s.id)} activeKey={drawerItem?.kind === "shipment" ? drawerItem.id : null} initialSort={{ key: "age", dir: "asc" }} exportName="returns" emptyWhat="returns" onClearFilters={clearAll} dense />
         <ChartCard title="Return timeline" subtitle="Returns entering the flow per day" empty={daily.length === 0}>
-          <TrendChart data={daily} xKey="date" xFormatter={formatDate} height={220} series={[{ key: "returns", label: "Returns", color: "#fbbf24", kind: "bar" }, { key: "failed", label: "Failed attempts", color: "#f87171", kind: "line" }]} />
+          <TrendChart data={daily} xKey="date" xFormatter={formatDate} height={220} series={[{ key: "returns", label: "Returns", color: "warning", kind: "bar" }, { key: "failed", label: "Failed attempts", color: "danger", kind: "line" }]} />
         </ChartCard>
       </div>
       <p className="mt-2 text-[10px] text-ink-500">Snapshot covers {derived.shipments.length} shipments; SKU-level analysis uses package type until item lines are exposed by the API.</p>

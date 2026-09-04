@@ -224,6 +224,11 @@ export interface VehicleLiveUpdate {
   /** Present once the backend publishes them (added 2026-09); optional for older payloads. */
   current_node_id?: string | null;
   destination_node_id?: string | null;
+  /** Which physical road of the corridor this trip is driving — "primary" is
+   *  the fastest, anything else is a longer alternative the driver took. */
+  road_variant?: string | null;
+  /** How far along that road, 0..1. */
+  road_progress?: number | null;
   timestamp: string;
 }
 

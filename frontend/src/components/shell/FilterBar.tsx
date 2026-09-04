@@ -86,7 +86,7 @@ export function FilterBar() {
   };
 
   return (
-    <div className="shrink-0 border-b border-nv-800 bg-nv-950/70">
+    <div className="layer-filterbar relative shrink-0 border-b border-nv-800 bg-nv-950/70">
       <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 md:px-4">
         <div className="flex items-center gap-0.5 rounded-md border border-nv-800 bg-nv-900 p-0.5" role="group" aria-label="Date range">
           <CalendarDays className="ml-1.5 h-3.5 w-3.5 text-ink-500" aria-hidden />

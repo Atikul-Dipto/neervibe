@@ -25,7 +25,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Suspense fallback={null}>
         <FilterUrlSync />
       </Suspense>
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-nv-900 focus:px-2 focus:py-1 focus:text-xs">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[100] focus:rounded focus:bg-nv-900 focus:px-2 focus:py-1 focus:text-xs">
         Skip to content
       </a>
       <div className="flex h-full">
@@ -34,7 +34,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <TopBar onMenu={() => setMobileNav(true)} />
           {showFilters && <FilterBar />}
           <div className="relative flex min-h-0 flex-1">
-            <main id="main" className="relative min-w-0 flex-1 overflow-y-auto">
+            {/* `layer-content` isolates the page: nothing inside it can paint above
+                the top bar, filter bar or sidebar, whatever z-index it sets. */}
+            <main id="main" className="layer-content relative min-w-0 flex-1 overflow-y-auto">
               <RouteGuard>{children}</RouteGuard>
             </main>
             <DetailDrawer />

@@ -1,46 +1,114 @@
+"use client";
+
+import { useMemo } from "react";
+import type { CSSProperties } from "react";
+import { cssVar, useTheme, type Theme } from "@/data/theme";
 import type { ExceptionPriority, SlaState, StatusGroup } from "@/data/derive";
 
-// Chart palette tuned for the dark surfaces (every hue ≥ 3:1 on #0f151d).
-export const CHART = {
-  series: ["#22d3ee", "#60a5fa", "#a78bfa", "#34d399", "#fbbf24", "#f87171", "#94a3b8", "#f472b6"],
-  grid: "#1e2833",
-  axis: "#7c8a99",
-  cursor: "rgba(255,255,255,0.04)",
-  tooltip: {
-    background: "#0f151d",
-    border: "1px solid #2a3644",
-    borderRadius: 6,
-    fontSize: 12,
-    color: "#e6edf3",
-    boxShadow: "0 6px 20px -6px rgba(0,0,0,0.6)",
-  },
-};
+/**
+ * SVG charts paint with literal colour strings — presentation attributes do
+ * not resolve `var()` — so the palette is read out of the stylesheet once per
+ * theme instead of being duplicated in TypeScript. `globals.css` stays the
+ * single source of truth for every colour in the product.
+ *
+ * The fallbacks are the light values, which is also what renders on the
+ * server, so the first paint matches the default theme.
+ */
+/**
+ * Semantic colour names charts are given instead of literal hex, so a series
+ * follows the active theme. Anything not in this list is passed through, which
+ * lets a caller still supply a literal colour where it genuinely needs one.
+ */
+export type ChartColor =
+  | "accent"
+  | "accent-soft"
+  | "good"
+  | "sage"
+  | "warning"
+  | "danger"
+  | "info"
+  | "ai"
+  | "muted"
+  | "pink"
+  | "ground"
+  | (string & {});
 
-export const STATUS_GROUP_COLORS: Record<StatusGroup, string> = {
-  pending: "#94a3b8",
-  in_transit: "#22d3ee",
-  out_for_delivery: "#60a5fa",
-  delivered: "#34d399",
-  failed: "#f87171",
-  returns: "#fbbf24",
-  cancelled: "#64748b",
-  lost: "#fb7185",
-};
+export interface ChartTheme {
+  series: string[];
+  /** Resolve a `ChartColor` to a concrete colour for the active theme. */
+  color: (c: ChartColor | undefined, fallback?: ChartColor) => string;
+  grid: string;
+  axis: string;
+  cursor: string;
+  tooltip: CSSProperties;
+  statusGroup: Record<StatusGroup, string>;
+  sla: Record<SlaState, string>;
+  priority: Record<ExceptionPriority, string>;
+  health: Record<"ok" | "warning" | "critical", string>;
+}
 
-export const SLA_COLORS: Record<SlaState, string> = {
-  on_track: "#34d399",
-  at_risk: "#fbbf24",
-  breached: "#f87171",
-  met: "#34d399",
-  missed: "#f87171",
-  n_a: "#64748b",
-};
+function build(theme: Theme): ChartTheme {
+  // Fallbacks only matter before the stylesheet is applied (SSR, first paint),
+  // so they follow the requested theme rather than always assuming light.
+  const dark = theme === "dark";
+  const viz = (n: number, fallback: string) => cssVar(`--viz-${n}`, fallback);
+  const good = viz(1, dark ? "#8fc767" : "#689d4b");
+  const info = viz(2, dark ? "#6fa0c8" : "#4a7ba7");
+  const ai = viz(3, dark ? "#a08cc9" : "#7e68a8");
+  const sage = viz(4, dark ? "#bcd79f" : "#91ae6e");
+  const warn = viz(5, dark ? "#d9a55e" : "#c08a2e");
+  const bad = viz(6, dark ? "#ef8a8a" : "#d96868");
+  const muted = viz(7, dark ? "#9aa48d" : "#7c8570");
+  const pink = viz(8, dark ? "#d18cae" : "#b06a8c");
 
-export const PRIORITY_COLORS: Record<ExceptionPriority, string> = {
-  critical: "#f87171",
-  high: "#fbbf24",
-  medium: "#60a5fa",
-  low: "#94a3b8",
-};
+  const named: Record<string, string> = {
+    accent: good,
+    "accent-soft": cssVar("--accent-300", "#91ae6e"),
+    good,
+    sage,
+    warning: warn,
+    danger: bad,
+    info,
+    ai,
+    muted,
+    pink,
+    ground: cssVar("--nv-950", "#f2f2f2"),
+  };
 
-export const HEALTH_COLORS = { ok: "#34d399", warning: "#fbbf24", critical: "#f87171" } as const;
+  return {
+    series: [good, info, ai, sage, warn, bad, muted, pink],
+    color: (c, fallback = "accent") => (c ? (named[c] ?? c) : (named[fallback] ?? good)),
+    grid: cssVar("--viz-grid", "#e2e4db"),
+    axis: cssVar("--viz-axis", "#737e68"),
+    cursor: cssVar("--viz-cursor", "rgba(31,36,25,0.05)"),
+    tooltip: {
+      background: cssVar("--nv-900", "#ffffff"),
+      border: `1px solid ${cssVar("--nv-700", "#c7cbbc")}`,
+      borderRadius: 6,
+      fontSize: 12,
+      color: cssVar("--ink-900", "#1f2419"),
+      boxShadow: cssVar("--elev-md", "0 6px 18px -8px rgba(31,36,25,0.22)"),
+    },
+    // Status groups need eight distinguishable hues, more than the brand
+    // palette carries, so the derived companions fill the gaps.
+    statusGroup: {
+      pending: muted,
+      in_transit: info,
+      out_for_delivery: ai,
+      delivered: good,
+      failed: bad,
+      returns: warn,
+      cancelled: cssVar("--ink-400", "#8f9885"),
+      lost: pink,
+    },
+    sla: { on_track: good, at_risk: warn, breached: bad, met: good, missed: bad, n_a: muted },
+    priority: { critical: bad, high: warn, medium: info, low: muted },
+    health: { ok: good, warning: warn, critical: bad },
+  };
+}
+
+/** The chart palette for the active theme. Recomputed only when it changes. */
+export function useChartTheme(): ChartTheme {
+  const theme = useTheme();
+  return useMemo(() => build(theme), [theme]);
+}

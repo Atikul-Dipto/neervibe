@@ -146,7 +146,7 @@ export function Popover({
       {isOpen && (
         <div
           className={clsx(
-            "absolute z-30 mt-1 rounded-md border border-nv-700 bg-nv-900 shadow-[var(--shadow-lg)] animate-[rise-in_120ms_ease-out]",
+            "layer-popover absolute mt-1 rounded-md border border-nv-700 bg-nv-900 shadow-[var(--shadow-lg)] animate-[rise-in_120ms_ease-out]",
             align === "right" ? "right-0" : "left-0",
             width,
           )}

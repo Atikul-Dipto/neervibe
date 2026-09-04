@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import type { ReactNode } from "react";
+import { useChartTheme, type ChartColor } from "./chartTheme";
 
 export interface BarRow {
   key: string;
@@ -10,7 +11,7 @@ export interface BarRow {
   /** Text shown right of the bar; defaults to the formatted value. */
   display?: string;
   secondary?: ReactNode;
-  color?: string;
+  color?: ChartColor;
 }
 
 /** Ranked horizontal bars — the workhorse for "top hubs", "city performance",
@@ -32,6 +33,7 @@ export function BarList({
   className?: string;
   emptyMessage?: string;
 }) {
+  const chart = useChartTheme();
   const top = max ?? Math.max(1, ...rows.map((r) => r.value));
   if (rows.length === 0) return <div className="py-6 text-center text-xs text-ink-500">{emptyMessage}</div>;
   return (
@@ -58,7 +60,7 @@ export function BarList({
               <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-nv-800">
                 <div
                   className="h-full rounded-full transition-[width] duration-500"
-                  style={{ width: `${Math.max(2, (r.value / top) * 100)}%`, backgroundColor: r.color ?? "#22d3ee" }}
+                  style={{ width: `${Math.max(2, (r.value / top) * 100)}%`, backgroundColor: chart.color(r.color) }}
                 />
               </div>
             </div>

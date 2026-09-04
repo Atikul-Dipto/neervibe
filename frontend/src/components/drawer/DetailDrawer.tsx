@@ -81,7 +81,7 @@ export function DetailDrawer() {
     <aside
       role="complementary"
       aria-label={`${KIND_LABELS[item.kind]} detail`}
-      className="absolute inset-y-0 right-0 z-40 flex w-full flex-col border-l border-nv-800 bg-nv-950 shadow-[var(--shadow-lg)] animate-[slide-in-right_160ms_ease-out] sm:w-[400px] md:static md:z-auto md:shrink-0"
+      className="layer-drawer absolute inset-y-0 right-0 flex w-full flex-col border-l border-nv-800 bg-nv-950 shadow-[var(--shadow-lg)] animate-[slide-in-right_160ms_ease-out] sm:w-[400px] md:static md:z-auto md:shrink-0"
     >
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-nv-800 px-2">
         {history.length > 0 ? (
