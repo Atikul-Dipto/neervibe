@@ -31,10 +31,10 @@ export function TopNav() {
   return (
     <header className="grid h-14 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-nv-800 bg-gradient-to-b from-nv-900/85 to-nv-950/85 px-4 backdrop-blur">
       <div className="flex items-center gap-2 justify-self-start">
-        <span className="h-2 w-2 animate-[breathe_2.4s_ease-in-out_infinite] rounded-full bg-teal-400" />
-        <span className="font-semibold tracking-wide text-zinc-100">
+        <span className="h-2 w-2 animate-[breathe_2.4s_ease-in-out_infinite] rounded-full bg-accent-500" />
+        <span className="font-semibold tracking-wide text-ink-900">
           NEER
-          <span className="bg-gradient-to-r from-teal-300 via-teal-400 to-teal-500 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-plum via-[#6e2f66] to-accent-700 bg-clip-text text-transparent">
             VIBE
           </span>
         </span>
@@ -48,8 +48,8 @@ export function TopNav() {
             className={clsx(
               "relative flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all duration-200",
               activeView === item.view
-                ? "bg-gradient-to-br from-teal-500/15 to-teal-500/5 text-zinc-50 shadow-[inset_0_0_0_1px_rgba(45,212,191,0.3)] after:absolute after:inset-x-3.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-gradient-to-r after:from-teal-400 after:to-teal-300"
-                : "text-zinc-400 hover:-translate-y-px hover:bg-teal-400/10 hover:text-zinc-200",
+                ? "bg-gradient-to-br from-accent-300/50 to-accent-300/20 text-ink-900 shadow-[inset_0_0_0_1px_rgba(69,12,63,0.3)] after:absolute after:inset-x-3.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-gradient-to-r after:from-plum after:to-accent-500"
+                : "text-ink-600 hover:-translate-y-px hover:bg-accent-300/40 hover:text-ink-900",
             )}
           >
             <item.icon className="h-3.5 w-3.5" aria-hidden />

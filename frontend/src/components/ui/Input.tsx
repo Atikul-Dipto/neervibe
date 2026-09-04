@@ -7,7 +7,7 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
       <input
         ref={ref}
         className={clsx(
-          "w-full rounded-md border border-nv-700 bg-nv-900 px-3 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-500 transition-colors focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500/40",
+          "w-full rounded-md border border-nv-700 bg-nv-900 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 transition-colors focus:border-plum focus:outline-none focus:ring-1 focus:ring-plum/25",
           className,
         )}
         {...props}

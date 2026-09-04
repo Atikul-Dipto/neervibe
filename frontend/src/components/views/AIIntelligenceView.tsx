@@ -57,8 +57,8 @@ export function AIIntelligenceView() {
 
   return (
     <div className="p-6">
-      <h1 className="mb-1 text-lg font-semibold text-zinc-100">AI Intelligence</h1>
-      <p className="mb-6 text-sm text-zinc-500">
+      <h1 className="mb-1 text-lg font-semibold text-ink-900">AI Intelligence</h1>
+      <p className="mb-6 text-sm text-ink-500">
         TensorFlow/Keras ETA prediction — POST /api/v1/ml/eta/predict
       </p>
 
@@ -72,7 +72,7 @@ export function AIIntelligenceView() {
               step={0.5}
               value={distanceKm}
               onChange={(e) => setDistanceKm(Number(e.target.value))}
-              className="w-full accent-teal-500"
+              className="w-full accent-plum"
             />
           </Field>
 
@@ -84,7 +84,7 @@ export function AIIntelligenceView() {
               step={0.01}
               value={congestion}
               onChange={(e) => setCongestion(Number(e.target.value))}
-              className="w-full accent-teal-500"
+              className="w-full accent-plum"
             />
           </Field>
 
@@ -96,7 +96,7 @@ export function AIIntelligenceView() {
               step={0.1}
               value={weight}
               onChange={(e) => setWeight(Number(e.target.value))}
-              className="w-full accent-teal-500"
+              className="w-full accent-plum"
             />
           </Field>
 
@@ -149,10 +149,10 @@ export function AIIntelligenceView() {
         </form>
 
         <Card className="p-5">
-          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Prediction</h2>
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-ink-500">Prediction</h2>
 
           {!result && !error && (
-            <div className="flex h-40 items-center justify-center text-sm text-zinc-500">
+            <div className="flex h-40 items-center justify-center text-sm text-ink-500">
               Submit the form to run inference.
             </div>
           )}
@@ -162,21 +162,21 @@ export function AIIntelligenceView() {
           {result && (
             <div className="space-y-4">
               <div>
-                <div className="text-xs uppercase tracking-wider text-zinc-500">Predicted ETA</div>
-                <div className="text-4xl font-semibold tabular-nums text-teal-400">
+                <div className="text-xs uppercase tracking-wider text-ink-500">Predicted ETA</div>
+                <div className="text-4xl font-semibold tabular-nums text-accent-700">
                   {Math.round(result.predicted_eta_minutes)}{" "}
-                  <span className="text-lg font-normal text-zinc-400">minutes</span>
+                  <span className="text-lg font-normal text-ink-600">minutes</span>
                 </div>
               </div>
               <div>
-                <div className="text-xs uppercase tracking-wider text-zinc-500">Confidence</div>
+                <div className="text-xs uppercase tracking-wider text-ink-500">Confidence</div>
                 <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-nv-800">
                   <div
-                    className="h-full bg-teal-400 transition-[width] duration-500"
+                    className="h-full bg-accent-500 transition-[width] duration-500"
                     style={{ width: `${Math.round(result.confidence * 100)}%` }}
                   />
                 </div>
-                <div className="mt-1 text-sm tabular-nums text-zinc-400">{Math.round(result.confidence * 100)}%</div>
+                <div className="mt-1 text-sm tabular-nums text-ink-600">{Math.round(result.confidence * 100)}%</div>
               </div>
             </div>
           )}
@@ -189,7 +189,7 @@ export function AIIntelligenceView() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="mb-1.5 text-xs text-zinc-400">{label}</div>
+      <div className="mb-1.5 text-xs text-ink-600">{label}</div>
       {children}
     </label>
   );

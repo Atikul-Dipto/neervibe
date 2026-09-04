@@ -67,6 +67,8 @@ export const api = {
   listVehicles: (params?: { status?: string; limit?: number }) =>
     request<Vehicle[]>(`/vehicles${toQueryString(params)}`),
 
+  getVehicle: (id: string) => request<Vehicle>(`/vehicles/${id}`),
+
   trackPackage: (trackingNumber: string) =>
     request<PackageTracking>(`/tracking/${encodeURIComponent(trackingNumber)}`),
 

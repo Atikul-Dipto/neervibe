@@ -61,7 +61,7 @@ export function PackagesView() {
   }, [status]);
 
   const columns: TableColumn<Package>[] = [
-    { header: "Tracking #", cell: (p) => <span className="font-mono text-zinc-200">{p.tracking_number}</span> },
+    { header: "Tracking #", cell: (p) => <span className="font-mono text-ink-900">{p.tracking_number}</span> },
     {
       header: "Status",
       cell: (p) => (
@@ -70,13 +70,13 @@ export function PackagesView() {
         </StatusPill>
       ),
     },
-    { header: "Priority", cell: (p) => <span className="text-zinc-400">{p.priority}</span> },
-    { header: "Weight (kg)", cell: (p) => <span className="tabular-nums text-zinc-400">{p.package_weight.toFixed(2)}</span> },
-    { header: "Created", cell: (p) => <span className="text-zinc-500">{new Date(p.created_at).toLocaleString()}</span> },
+    { header: "Priority", cell: (p) => <span className="text-ink-600">{p.priority}</span> },
+    { header: "Weight (kg)", cell: (p) => <span className="tabular-nums text-ink-600">{p.package_weight.toFixed(2)}</span> },
+    { header: "Created", cell: (p) => <span className="text-ink-500">{new Date(p.created_at).toLocaleString()}</span> },
     {
       header: "Expected Delivery",
       cell: (p) => (
-        <span className="text-zinc-500">
+        <span className="text-ink-500">
           {p.expected_delivery_at ? new Date(p.expected_delivery_at).toLocaleString() : "—"}
         </span>
       ),
@@ -86,7 +86,7 @@ export function PackagesView() {
   return (
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-zinc-100">Packages</h1>
+        <h1 className="text-lg font-semibold text-ink-900">Packages</h1>
         <Select
           value={status}
           onChange={(e) => setStatus(e.target.value as PackageStatus | "")}

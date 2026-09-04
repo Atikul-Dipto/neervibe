@@ -13,20 +13,24 @@ import type { AnalyticsOverview, HubVolume } from "@/types/domain";
 // pills elsewhere in the app (PackagesView/VehiclesView tone maps), reused
 // here for brand consistency, validated for >=3:1 contrast against the
 // nv-950 chart surface via the dataviz skill's validator.
+// Light-theme steps of the same status hues, each checked >= 3:1 against
+// the white card surface with the dataviz validator (bars need 3:1;
+// the y-axis labels carry identity, so no legend box is needed).
 const STATUS_CHART_COLORS = {
-  inTransit: "#2dd4bf", // teal-400 — active/neutral
-  delivered: "#34d399", // emerald-400 — good
-  delayed: "#fbbf24", // amber-400 — warning
-  failed: "#fb7185", // rose-400 — critical
-  returns: "#94a3b8", // slate-400 — neutral/exception
+  inTransit: "#5f7a1f", // accent-700 — active/neutral (4.9:1)
+  delivered: "#059669", // emerald-600 — good (3.8:1)
+  delayed: "#d97706", // amber-600 — warning (3.2:1)
+  failed: "#f43f5e", // rose-500 — critical (3.7:1)
+  returns: "#64748b", // slate-500 — neutral/exception (4.8:1)
 };
 
 const CHART_TOOLTIP_STYLE = {
-  background: "#0a2224",
-  border: "1px solid #123338",
+  background: "#ffffff",
+  border: "1px solid #d9efbd",
   borderRadius: 8,
   fontSize: 12,
-  color: "#f4f4f5",
+  color: "#450c3f",
+  boxShadow: "0 4px 16px -4px rgba(69,12,63,0.12)",
 };
 
 function statusDistribution(network: AnalyticsOverview["network"]) {
@@ -43,14 +47,14 @@ export function AnalyticsView() {
   const { data, loading, error } = useAnalyticsOverview();
 
   const columns: TableColumn<HubVolume>[] = [
-    { header: "Hub", cell: (h) => <span className="text-zinc-300">{h.node_name}</span> },
-    { header: "Code", cell: (h) => <span className="font-mono text-zinc-400">{h.node_code}</span> },
-    { header: "Current Load", cell: (h) => <span className="tabular-nums text-zinc-400">{h.current_load.toLocaleString()}</span> },
-    { header: "Capacity", cell: (h) => <span className="tabular-nums text-zinc-400">{h.capacity.toLocaleString()}</span> },
+    { header: "Hub", cell: (h) => <span className="text-ink-700">{h.node_name}</span> },
+    { header: "Code", cell: (h) => <span className="font-mono text-ink-600">{h.node_code}</span> },
+    { header: "Current Load", cell: (h) => <span className="tabular-nums text-ink-600">{h.current_load.toLocaleString()}</span> },
+    { header: "Capacity", cell: (h) => <span className="tabular-nums text-ink-600">{h.capacity.toLocaleString()}</span> },
     {
       header: "Utilization",
       cell: (h) => (
-        <span className="tabular-nums text-zinc-400">
+        <span className="tabular-nums text-ink-600">
           {h.capacity > 0 ? `${((h.current_load / h.capacity) * 100).toFixed(1)}%` : "—"}
         </span>
       ),
@@ -59,7 +63,7 @@ export function AnalyticsView() {
 
   return (
     <div className="p-6">
-      <h1 className="mb-6 text-lg font-semibold text-zinc-100">Analytics</h1>
+      <h1 className="mb-6 text-lg font-semibold text-ink-900">Analytics</h1>
 
       {loading && (
         <StatSection title="Network Overview">
@@ -86,7 +90,7 @@ export function AnalyticsView() {
           </StatSection>
 
           <section className="mb-8">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-500">
               Package Status Distribution
             </h2>
             <Card className="p-4">
@@ -101,7 +105,7 @@ export function AnalyticsView() {
                     type="category"
                     dataKey="name"
                     width={90}
-                    tick={{ fill: "#a1a1aa", fontSize: 12 }}
+                    tick={{ fill: "#6e4468", fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                   />
@@ -136,7 +140,7 @@ export function AnalyticsView() {
           </StatSection>
 
           <section>
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-500">
               Highest-Volume Hubs
             </h2>
 
@@ -153,7 +157,7 @@ export function AnalyticsView() {
                       type="category"
                       dataKey="node_code"
                       width={80}
-                      tick={{ fill: "#a1a1aa", fontSize: 12 }}
+                      tick={{ fill: "#6e4468", fontSize: 12 }}
                       tickLine={false}
                       axisLine={false}
                     />
@@ -163,7 +167,7 @@ export function AnalyticsView() {
                       labelStyle={{ color: "#f4f4f5" }}
                       formatter={(value) => (typeof value === "number" ? value.toLocaleString() : value)}
                     />
-                    <Bar dataKey="current_load" fill="#2dd4bf" radius={[0, 4, 4, 0]} maxBarSize={16} />
+                    <Bar dataKey="current_load" fill="#450c3f" radius={[0, 4, 4, 0]} maxBarSize={16} />
                   </BarChart>
                 </ResponsiveContainer>
               </Card>

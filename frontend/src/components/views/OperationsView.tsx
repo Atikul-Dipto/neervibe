@@ -22,7 +22,7 @@ export function OperationsView() {
 
   return (
     <div className="p-6">
-      <h1 className="mb-6 text-lg font-semibold text-zinc-100">Operations</h1>
+      <h1 className="mb-6 text-lg font-semibold text-ink-900">Operations</h1>
 
       {loading && (
         <StatSection title="Timing">

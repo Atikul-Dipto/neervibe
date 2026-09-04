@@ -31,19 +31,19 @@ export function HubsView() {
   }, [nodeType]);
 
   const columns: TableColumn<LogisticsNode>[] = [
-    { header: "Code", cell: (n) => <span className="font-mono text-zinc-200">{n.node_code}</span> },
-    { header: "Name", cell: (n) => <span className="text-zinc-300">{n.node_name}</span> },
+    { header: "Code", cell: (n) => <span className="font-mono text-ink-900">{n.node_code}</span> },
+    { header: "Name", cell: (n) => <span className="text-ink-700">{n.node_name}</span> },
     {
       header: "Type",
       cell: (n) => (
-        <span className="inline-flex items-center gap-1.5 text-zinc-400">
+        <span className="inline-flex items-center gap-1.5 text-ink-600">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: NODE_TYPE_COLORS[n.node_type] }} />
           {n.node_type.replaceAll("_", " ")}
         </span>
       ),
     },
-    { header: "City", cell: (n) => <span className="text-zinc-400">{n.city}</span> },
-    { header: "Capacity", cell: (n) => <span className="tabular-nums text-zinc-400">{n.capacity.toLocaleString()}</span> },
+    { header: "City", cell: (n) => <span className="text-ink-600">{n.city}</span> },
+    { header: "Capacity", cell: (n) => <span className="tabular-nums text-ink-600">{n.capacity.toLocaleString()}</span> },
     {
       header: "Status",
       cell: (n) => (
@@ -57,7 +57,7 @@ export function HubsView() {
   return (
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-zinc-100">Hubs &amp; Nodes</h1>
+        <h1 className="text-lg font-semibold text-ink-900">Hubs &amp; Nodes</h1>
         <Select value={nodeType} onChange={(e) => setNodeType(e.target.value as NodeType | "")} className="w-56">
           <option value="">All types</option>
           {NODE_TYPES.map((t) => (

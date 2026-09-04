@@ -1,51 +1,71 @@
 @import "tailwindcss";
 
-/* NeerVibe brand scale — a deep teal-black, water-inspired chrome (panels,
-   borders, page background) instead of generic neutral slate. Paired with
-   Tailwind's built-in `teal` scale for interactive/live accents. */
+/* NeerVibe light theme — a pale lime/cream chrome with deep plum ink.
+   Brand palette: #450C3F (plum), #B9D175 (lime), #D9EFBD (pale green),
+   #F5FBDA (cream). The `nv-*` scale is the SURFACE LADDER every component
+   is built on: 950 = page, 900 = raised surface (cards, inputs),
+   850 = hover, 800 = border, 700 = strong border, 600 = accent fill. */
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  --color-nv-950: #04181a;
-  --color-nv-900: #0a2224;
-  --color-nv-850: #0d2b2e;
-  --color-nv-800: #123338;
-  --color-nv-700: #1c454b;
-  --color-nv-600: #2a5e64;
+  --color-nv-950: #f5fbda;
+  --color-nv-900: #ffffff;
+  --color-nv-850: #eef7d9;
+  --color-nv-800: #d9efbd;
+  --color-nv-700: #c4dda0;
+  --color-nv-600: #b9d175;
 
-  /* Semantic surface/text tokens — the vocabulary every UI primitive is
-     built against, so the palette can shift in one place instead of
-     hunting raw nv- and slate utility classes through every component. */
+  /* Ink — plum-tinted text ladder. 900 body text, 700 strong secondary,
+     600 secondary, 500 muted labels, 400 disabled/very muted, 300 hairlines.
+     Contrast on white: 900 15:1, 600 7.8:1, 500 4.9:1, 400 3.1:1 (large only). */
+  --color-ink-900: #450c3f;
+  --color-ink-700: #5a2953;
+  --color-ink-600: #6e4468;
+  --color-ink-500: #8a6684;
+  --color-ink-400: #a48aa0;
+  --color-ink-300: #c7b5c4;
+
+  /* Accent — the lime, plus darker steps so it can carry TEXT.
+     #B9D175 is 1.7:1 on white: fills, highlights and glows only.
+     700 (#5F7A1F) is 4.9:1 and is the readable accent for links/labels. */
+  --color-accent-100: #f5fbda;
+  --color-accent-200: #d9efbd;
+  --color-accent-300: #b9d175;
+  --color-accent-500: #7a9a2e;
+  --color-accent-700: #5f7a1f;
+
+  --color-plum: #450c3f;
+  --color-plum-hover: #5c1a54;
+
   --color-bg: var(--color-nv-950);
-  --color-surface: color-mix(in oklab, var(--color-nv-900) 60%, transparent);
-  --color-surface-solid: var(--color-nv-900);
+  --color-surface: var(--color-nv-900);
   --color-surface-hover: var(--color-nv-850);
   --color-border: var(--color-nv-800);
   --color-border-strong: var(--color-nv-700);
 
-  --color-text-primary: var(--color-zinc-100);
-  --color-text-secondary: var(--color-zinc-400);
-  --color-text-muted: var(--color-zinc-500);
+  --color-text-primary: var(--color-ink-900);
+  --color-text-secondary: var(--color-ink-600);
+  --color-text-muted: var(--color-ink-500);
 
-  --color-accent: var(--color-teal-400);
-  --color-accent-strong: var(--color-teal-300);
-  --color-accent-soft: color-mix(in oklab, var(--color-teal-500) 12%, transparent);
+  --color-success: var(--color-emerald-700);
+  --color-warning: var(--color-amber-700);
+  --color-danger: var(--color-rose-600);
 
-  --color-success: var(--color-emerald-400);
-  --color-warning: var(--color-amber-400);
-  --color-danger: var(--color-rose-400);
-
-  /* Elevation — subtle, dark-mode-appropriate shadows (a light glow, not a
-     drop shadow) so raised surfaces (cards, panels, popovers) read as
-     lifted without looking like a generic light-mode UI dropped in. */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  --shadow-lg: 0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  /* Elevation — soft plum-tinted shadows so raised surfaces lift gently
+     off the cream page instead of the dark theme's glow rings. */
+  --shadow-sm: 0 1px 2px rgba(69, 12, 63, 0.06);
+  --shadow-md: 0 4px 16px -4px rgba(69, 12, 63, 0.12), 0 0 0 1px rgba(69, 12, 63, 0.05);
+  --shadow-lg: 0 12px 32px -8px rgba(69, 12, 63, 0.16), 0 0 0 1px rgba(69, 12, 63, 0.06);
 
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
+}
+
+html {
+  /* Native controls (select popups, scrollbars) follow the light theme. */
+  color-scheme: light;
 }
 
 html,
@@ -55,11 +75,9 @@ body,
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--color-teal-500) 35%, transparent);
+  background: color-mix(in oklab, var(--color-accent-300) 55%, transparent);
 }
 
-/* Thin, dark-mode scrollbars — the default light-grey scrollbar reads badly
-   against the teal-black chrome, especially in scrollable tables/panels. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-nv-700) transparent;
@@ -69,10 +87,11 @@ body,
    and a fading pulse ring for live-status dots. Referenced via Tailwind
    arbitrary values, e.g. animate-[breathe_2.4s_ease-in-out_infinite]. */
 @keyframes breathe {
-  0%, 100% { box-shadow: 0 0 6px 1px rgba(45, 212, 191, 0.5); }
-  50% { box-shadow: 0 0 14px 4px rgba(45, 212, 191, 0.85); }
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(185, 209, 117, 0.6); }
+  50% { box-shadow: 0 0 14px 4px rgba(185, 209, 117, 0.95); }
 }
+/* The dot itself stays solid; only its ring expands and fades. */
 @keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-  70%, 100% { box-shadow: 0 0 0 7px transparent; opacity: 0; }
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70%, 100% { box-shadow: 0 0 0 8px transparent; }
 }

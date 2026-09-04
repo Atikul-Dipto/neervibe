@@ -67,18 +67,18 @@ export function VehiclesView() {
   });
 
   const columns: TableColumn<VehicleRow>[] = [
-    { header: "Registration", cell: (r) => <span className="font-mono text-zinc-200">{r.vehicle.registration_number}</span> },
-    { header: "Type", cell: (r) => <span className="text-zinc-400">{r.vehicle.vehicle_type.replaceAll("_", " ")}</span> },
+    { header: "Registration", cell: (r) => <span className="font-mono text-ink-900">{r.vehicle.registration_number}</span> },
+    { header: "Type", cell: (r) => <span className="text-ink-600">{r.vehicle.vehicle_type.replaceAll("_", " ")}</span> },
     {
       header: "Status",
       cell: (r) => <StatusPill tone={STATUS_TONE[r.status] ?? "neutral"}>{r.status.replaceAll("_", " ")}</StatusPill>,
     },
-    { header: "Speed (km/h)", cell: (r) => <span className="tabular-nums text-zinc-400">{r.speed.toFixed(1)}</span> },
-    { header: "Capacity (kg)", cell: (r) => <span className="tabular-nums text-zinc-400">{r.vehicle.capacity.toFixed(0)}</span> },
+    { header: "Speed (km/h)", cell: (r) => <span className="tabular-nums text-ink-600">{r.speed.toFixed(1)}</span> },
+    { header: "Capacity (kg)", cell: (r) => <span className="tabular-nums text-ink-600">{r.vehicle.capacity.toFixed(0)}</span> },
     {
       header: "Position",
       cell: (r) => (
-        <span className="tabular-nums text-zinc-500">
+        <span className="tabular-nums text-ink-500">
           {r.lat != null && r.lon != null ? `${r.lat.toFixed(3)}, ${r.lon.toFixed(3)}` : "—"}
         </span>
       ),
@@ -88,7 +88,7 @@ export function VehiclesView() {
   return (
     <div className="p-6">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-zinc-100">Vehicles</h1>
+        <h1 className="text-lg font-semibold text-ink-900">Vehicles</h1>
         <Select
           value={status}
           onChange={(e) => setStatus(e.target.value as VehicleStatus | "")}
