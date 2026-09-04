@@ -301,6 +301,7 @@ export function MapView({ className }: { className?: string }) {
   /** Smoothed spacing between live updates, and when each feed last spoke. */
   const feedIntervalRef = useRef<{ vehicles: number; riders: number }>({ vehicles: DEFAULT_GLIDE_MS, riders: DEFAULT_GLIDE_MS });
   const feedLastAtRef = useRef<{ vehicles: number; riders: number }>({ vehicles: 0, riders: 0 });
+  const feedSeenRef = useRef<{ vehicles: boolean; riders: boolean }>({ vehicles: false, riders: false });
   /** While the user is panning or zooming, the follow camera keeps its hands off. */
   const userCameraUntilRef = useRef(0);
   const hoveredRef = useRef<{ source: string; id: string } | null>(null);
@@ -418,7 +419,10 @@ export function MapView({ className }: { className?: string }) {
       // Ignore absurd gaps: a backgrounded tab or a reconnect is not the rate.
       if (gap > 200 && gap < 30000) {
         const prev = feedIntervalRef.current[feed];
-        feedIntervalRef.current[feed] = prev + (gap - prev) * INTERVAL_SMOOTHING;
+        // Take the first real sample whole; blending up from a guess would
+        // leave every marker stalling for the first half-minute.
+        feedIntervalRef.current[feed] = feedSeenRef.current[feed] ? prev + (gap - prev) * INTERVAL_SMOOTHING : gap;
+        feedSeenRef.current[feed] = true;
       }
     }
     feedLastAtRef.current[feed] = now;

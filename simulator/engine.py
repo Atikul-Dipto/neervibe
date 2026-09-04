@@ -404,13 +404,23 @@ class SimulationEngine:
         result = await session.execute(
             select(Package).where(Package.current_status == PackageStatus.OUT_FOR_DELIVERY)
         )
-        adopted = 0
-        for package in result.scalars().all():
-            rider_id = package.assigned_rider_id
-            if rider_id is not None and rider_id in self.rider_runtime:
-                continue
+        orphans = [
+            p
+            for p in result.scalars().all()
+            if p.assigned_rider_id is None or p.assigned_rider_id not in self.rider_runtime
+        ]
+        if not orphans:
+            return
+        wanted = [p.assigned_rider_id for p in orphans if p.assigned_rider_id]
+        riders_by_id = {
+            r.id: r
+            for r in (await session.execute(select(Rider).where(Rider.id.in_(wanted)))).scalars().all()
+        } if wanted else {}
 
-            rider = await session.get(Rider, rider_id) if rider_id else None
+        adopted = 0
+        for package in orphans:
+            rider_id = package.assigned_rider_id
+            rider = riders_by_id.get(rider_id) if rider_id else None
             if rider is None:
                 # Lost its rider entirely: hand it to whoever is free.
                 origin = self.nodes.get(package.current_node_id) if package.current_node_id else None
@@ -433,8 +443,31 @@ class SimulationEngine:
             logger.info("Adopted %d last-mile deliveries with no rider on the road", adopted)
 
     async def move_riders(self, session: AsyncSession) -> None:
+        if not self.rider_runtime:
+            return
+        # Each tick opens a fresh session, so `session.get` per rider is a
+        # separate round trip to the database — 30-odd of them, which is most
+        # of a tick on a hosted Postgres. One query instead.
+        ids = list(self.rider_runtime)
+        riders = {
+            r.id: r
+            for r in (await session.execute(select(Rider).where(Rider.id.in_(ids)))).scalars().all()
+        }
+        packages = {
+            p.id: p
+            for p in (
+                await session.execute(
+                    select(Package).where(
+                        Package.id.in_([rt.package_id for rt in self.rider_runtime.values()])
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        }
+
         for rider_id, runtime in list(self.rider_runtime.items()):
-            rider = await session.get(Rider, rider_id)
+            rider = riders.get(rider_id)
             if rider is None:
                 del self.rider_runtime[rider_id]
                 continue
@@ -465,7 +498,7 @@ class SimulationEngine:
                 rider.current_node_id = dest.id
 
             if runtime.phase == "outbound":
-                await self.resolve_doorstep(session, runtime, dest)
+                await self.resolve_doorstep(session, runtime, dest, packages.get(runtime.package_id))
                 # Head back to the hub they came from, ready for the next job.
                 if origin is not None and dest is not None:
                     runtime.phase = "return"
@@ -484,7 +517,11 @@ class SimulationEngine:
             await self.publish_rider(rider, self.rider_runtime.get(rider_id))
 
     async def resolve_doorstep(
-        self, session: AsyncSession, runtime: RiderRuntime, node: LogisticsNode | None
+        self,
+        session: AsyncSession,
+        runtime: RiderRuntime,
+        node: LogisticsNode | None,
+        package: Package | None,
     ) -> None:
         """The delivery attempt, made where and when the rider arrives.
 
@@ -493,7 +530,6 @@ class SimulationEngine:
         an outcome happens without moving the network's headline delivery and
         failure rates.
         """
-        package = await session.get(Package, runtime.package_id)
         if package is None or package.current_status != PackageStatus.OUT_FOR_DELIVERY:
             return
         delivered = random.random() < DOORSTEP_SUCCESS_RATE
