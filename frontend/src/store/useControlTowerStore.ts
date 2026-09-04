@@ -10,16 +10,7 @@ import type {
   VehicleLiveUpdate,
 } from "@/types/domain";
 
-const MAX_EVENT_LOG = 50;
-
-export type ActiveView =
-  | "network"
-  | "operations"
-  | "packages"
-  | "vehicles"
-  | "hubs"
-  | "analytics"
-  | "ai";
+const MAX_EVENT_LOG = 80;
 
 /** A selected administrative area — just the feature's properties; the
  * geometry stays in `regions` and is looked up by id when needed. */
@@ -30,6 +21,19 @@ export interface RegionIndex {
   district: RegionFeature[];
   byId: Map<string, RegionFeature>;
 }
+
+export type MapLayerKey = "nodes" | "routes" | "vehicles" | "riders" | "boundaries" | "heatmap" | "risk" | "labels";
+
+export const MAP_LAYER_LABELS: Record<MapLayerKey, string> = {
+  nodes: "Facilities",
+  routes: "Corridors",
+  vehicles: "Vehicles",
+  riders: "Riders",
+  boundaries: "Boundaries",
+  heatmap: "Delivery density",
+  risk: "SLA risk colouring",
+  labels: "Basemap labels",
+};
 
 let regionsPromise: Promise<RegionIndex> | null = null;
 
@@ -50,9 +54,7 @@ async function fetchRegions(): Promise<RegionIndex> {
 }
 
 /** The selected area is context, not a filter: it stays while the user
- * inspects things *inside* it, but picking something outside (a vehicle
- * from the table that happens to be in another division) releases it, so
- * the map never shows a hub or vehicle under the "outside the area" wash. */
+ * inspects things *inside* it, but picking something outside releases it. */
 function regionAfterPick(s: ControlTowerState, lon: number | null, lat: number | null): RegionRef | null {
   const region = s.selectedRegion;
   if (!region || lon == null || lat == null || !s.regions) return region;
@@ -61,44 +63,37 @@ function regionAfterPick(s: ControlTowerState, lon: number | null, lat: number |
 }
 
 interface ControlTowerState {
-  activeView: ActiveView;
   selectedNode: LogisticsNode | null;
   selectedTrackingNumber: string | null;
   selectedVehicle: Vehicle | null;
   selectedRegion: RegionRef | null;
-  /** Full tracking payload for `selectedTrackingNumber`, once fetched. */
   trackedPackage: PackageTracking | null;
   vehicles: Map<string, VehicleLiveUpdate>;
   eventLog: PackageLiveUpdate[];
-  filters: { nodeType: string | null; city: string | null };
-  /** The static network, shared so panels can do area stats without refetching. */
+  /** Static network copy kept for the map (mirrors the data store). */
   nodes: LogisticsNode[];
   routes: LogisticsRoute[];
   regions: RegionIndex | null;
   regionsError: string | null;
-  /** Camera tracks the selected vehicle as it moves (Uber-style). */
   followVehicle: boolean;
-  showBoundaries: boolean;
+  layers: Record<MapLayerKey, boolean>;
 
-  setActiveView: (view: ActiveView) => void;
   selectNode: (node: LogisticsNode | null) => void;
   selectTrackingNumber: (trackingNumber: string | null) => void;
   selectVehicle: (vehicle: Vehicle | null) => void;
-  /** Replace the selected vehicle's REST snapshot without resetting follow/camera state. */
   refreshSelectedVehicle: (vehicle: Vehicle) => void;
   selectRegion: (region: RegionRef | null) => void;
+  clearSelection: () => void;
   setTrackedPackage: (pkg: PackageTracking | null) => void;
   upsertVehicle: (update: VehicleLiveUpdate) => void;
   pushEvent: (update: PackageLiveUpdate) => void;
-  setFilter: (key: "nodeType" | "city", value: string | null) => void;
   setNetwork: (nodes: LogisticsNode[], routes: LogisticsRoute[]) => void;
   loadRegions: () => Promise<void>;
   setFollowVehicle: (follow: boolean) => void;
-  setShowBoundaries: (show: boolean) => void;
+  setLayer: (key: MapLayerKey, on: boolean) => void;
 }
 
 export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
-  activeView: "network",
   selectedNode: null,
   selectedTrackingNumber: null,
   selectedVehicle: null,
@@ -106,19 +101,13 @@ export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
   trackedPackage: null,
   vehicles: new Map(),
   eventLog: [],
-  filters: { nodeType: null, city: null },
   nodes: [],
   routes: [],
   regions: null,
   regionsError: null,
   followVehicle: false,
-  showBoundaries: true,
+  layers: { nodes: true, routes: true, vehicles: true, riders: true, boundaries: true, heatmap: false, risk: false, labels: true },
 
-  setActiveView: (view) => set({ activeView: view }),
-
-  // Node / vehicle / package selections are mutually exclusive; a selected
-  // region is the surrounding *context* and survives them, so the camera
-  // can fall back to the area when the inner selection is cleared.
   selectNode: (node) =>
     set((s) => ({
       selectedNode: node,
@@ -127,7 +116,6 @@ export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
       trackedPackage: null,
       selectedRegion: node ? regionAfterPick(s, node.longitude, node.latitude) : s.selectedRegion,
     })),
-  // A package path can span the whole country, so it always gets the full map.
   selectTrackingNumber: (trackingNumber) =>
     set((s) => ({
       selectedTrackingNumber: trackingNumber,
@@ -160,6 +148,8 @@ export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
       selectedTrackingNumber: null,
       trackedPackage: null,
     }),
+  clearSelection: () =>
+    set({ selectedRegion: null, selectedNode: null, selectedVehicle: null, selectedTrackingNumber: null, trackedPackage: null, followVehicle: false }),
   setTrackedPackage: (pkg) =>
     set((s) => (pkg == null || s.selectedTrackingNumber === pkg.tracking_number ? { trackedPackage: pkg } : {})),
 
@@ -172,9 +162,6 @@ export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
 
   pushEvent: (update) =>
     set((s) => ({ eventLog: [update, ...s.eventLog].slice(0, MAX_EVENT_LOG) })),
-
-  setFilter: (key, value) =>
-    set((s) => ({ filters: { ...s.filters, [key]: value } })),
 
   setNetwork: (nodes, routes) => set({ nodes, routes }),
 
@@ -190,5 +177,5 @@ export const useControlTowerStore = create<ControlTowerState>((set, get) => ({
   },
 
   setFollowVehicle: (follow) => set({ followVehicle: follow }),
-  setShowBoundaries: (show) => set({ showBoundaries: show }),
+  setLayer: (key, on) => set((s) => ({ layers: { ...s.layers, [key]: on } })),
 }));

@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal, engine
+from app.services.placement import NodeGraph, locate_package
 from app.models.enums import (
     DeliveryType,
     PackageStatus,
@@ -114,6 +115,10 @@ async def generate(count: int) -> None:
             print("Run scripts/seed_database.py first — logistics network is empty.")
             return
 
+        # A parcel is always physically somewhere: without a current node,
+        # hub load and sorting queues read zero for the whole network.
+        graph = NodeGraph(list((await session.execute(select(LogisticsNode))).scalars().all()))
+
         now = datetime.now(timezone.utc)
         created = 0
         batch_size = 500
@@ -146,6 +151,10 @@ async def generate(count: int) -> None:
             if status == PackageStatus.DELIVERED:
                 actual_delivery_at = created_at + timedelta(hours=random.uniform(2, sla_hours * 1.3))
 
+            source_node = random.choice(source_nodes)
+            dest_node = random.choice(dest_nodes)
+            current_node = locate_package(status, source_node, dest_node, graph)
+
             package = Package(
                 tracking_number=f"PKG-{uuid.uuid4().hex[:12].upper()}",
                 order_id=order.id,
@@ -163,8 +172,9 @@ async def generate(count: int) -> None:
                     list(Priority), weights=[0.15, 0.55, 0.22, 0.08], k=1
                 )[0],
                 current_status=status,
-                source_node_id=random.choice(source_nodes).id,
-                destination_node_id=random.choice(dest_nodes).id,
+                source_node_id=source_node.id,
+                destination_node_id=dest_node.id,
+                current_node_id=current_node.id if current_node else None,
                 expected_delivery_at=expected_delivery_at,
                 actual_delivery_at=actual_delivery_at,
                 created_at=created_at,

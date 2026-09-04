@@ -33,12 +33,39 @@ export type PackageStatus =
   | "LOST"
   | "DAMAGED";
 
+export const PACKAGE_STATUSES: PackageStatus[] = [
+  "PACKAGE_CREATED",
+  "PICKUP_ASSIGNED",
+  "PICKED_UP",
+  "ARRIVED_AT_HUB",
+  "SORTING",
+  "DISPATCHED",
+  "IN_TRANSIT",
+  "ARRIVED_AT_DESTINATION_HUB",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  "DELIVERY_FAILED",
+  "RESCHEDULED",
+  "CANCELLED",
+  "RETURN_REQUESTED",
+  "RETURN_IN_TRANSIT",
+  "RETURNED",
+  "LOST",
+  "DAMAGED",
+];
+
 export type VehicleStatus = "IDLE" | "EN_ROUTE" | "LOADING" | "UNLOADING" | "MAINTENANCE" | "OFFLINE";
 export type VehicleType = "BICYCLE" | "MOTORCYCLE" | "VAN" | "TRUCK" | "MINI_TRUCK";
 export type RiderStatus = "AVAILABLE" | "ON_DELIVERY" | "ON_PICKUP" | "OFF_DUTY";
 export type RouteStatus = "ACTIVE" | "CONGESTED" | "BLOCKED" | "SUSPENDED";
 export type RoadType = "HIGHWAY" | "ARTERIAL" | "URBAN" | "RURAL" | "FERRY";
 export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+export type PackageType = "DOCUMENT" | "PARCEL" | "FRAGILE" | "PERISHABLE" | "BULK" | "ELECTRONICS";
+export type PaymentType = "PREPAID" | "COD";
+export type DeliveryType = "STANDARD" | "EXPRESS" | "SAME_DAY" | "SCHEDULED";
+export type DeliveryAttemptResult = "SUCCESS" | "FAILED_NO_RECIPIENT" | "FAILED_ADDRESS_ISSUE" | "FAILED_REFUSED";
+
+export const DELIVERY_TYPES: DeliveryType[] = ["STANDARD", "EXPRESS", "SAME_DAY", "SCHEDULED"];
 
 export interface LogisticsNode {
   id: string;
@@ -76,7 +103,12 @@ export interface Package {
   order_id: string;
   customer_id: string;
   merchant_id: string;
+  package_type: PackageType;
   package_weight: number;
+  package_volume: number | null;
+  declared_value: number | null;
+  payment_type: PaymentType;
+  delivery_type: DeliveryType;
   priority: Priority;
   current_status: PackageStatus;
   current_node_id: string | null;
@@ -87,6 +119,78 @@ export interface Package {
   expected_delivery_at: string | null;
   actual_delivery_at: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export interface PackageStatusUpdate {
+  new_status: PackageStatus;
+  node_id?: string;
+  rider_id?: string;
+  vehicle_id?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface Order {
+  id: string;
+  order_number: string;
+  customer_id: string;
+  merchant_id: string;
+  order_value: number;
+  status: string;
+  placed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Merchant {
+  id: string;
+  business_name: string;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  pickup_node_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PackageEvent {
+  id: string;
+  package_id: string;
+  event_type: string;
+  node_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  timestamp: string;
+  previous_status: string | null;
+  new_status: string | null;
+  rider_id: string | null;
+  vehicle_id: string | null;
+  event_metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface DeliveryAttempt {
+  id: string;
+  package_id: string;
+  rider_id: string | null;
+  attempt_number: number;
+  result: DeliveryAttemptResult;
+  notes: string | null;
+  attempted_at: string;
 }
 
 export interface PackageTimelineStep {
@@ -117,6 +221,9 @@ export interface VehicleLiveUpdate {
   speed: number;
   heading: number;
   status: VehicleStatus;
+  /** Present once the backend publishes them (added 2026-09); optional for older payloads. */
+  current_node_id?: string | null;
+  destination_node_id?: string | null;
   timestamp: string;
 }
 

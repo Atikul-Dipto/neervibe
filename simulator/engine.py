@@ -37,6 +37,7 @@ from app.models.event import PackageEvent
 from app.models.node import LogisticsNode
 from app.models.package import Package
 from app.models.vehicle import Rider, Vehicle
+from app.services.placement import TERMINAL_STATUSES
 from app.state_machine.package_state_machine import is_valid_transition, next_possible_statuses
 from simulator import redis_channels
 
@@ -336,12 +337,36 @@ class SimulationEngine:
             if package.current_status == PackageStatus.PACKAGE_CREATED:
                 await self.transition_package(session, package, PackageStatus.PICKUP_ASSIGNED, None)
 
+    async def refresh_node_loads(self, session: AsyncSession) -> None:
+        """`logistics_nodes.current_load` is a denormalised mirror of "how
+        many non-terminal packages sit at this node". Nothing else maintains
+        it, so hub utilisation would read zero forever without this."""
+        rows = (
+            await session.execute(
+                select(LogisticsNode.id, func.count(Package.id))
+                .outerjoin(
+                    Package,
+                    (Package.current_node_id == LogisticsNode.id)
+                    & (Package.current_status.not_in([s.value for s in TERMINAL_STATUSES])),
+                )
+                .group_by(LogisticsNode.id)
+            )
+        ).all()
+        for node_id, load in rows:
+            node = self.nodes.get(node_id)
+            if node is not None and node.current_load != load:
+                node.current_load = load
+                await session.merge(node)
+
     async def tick(self) -> None:
         async with AsyncSessionLocal() as session:
             vehicles = await self.ensure_vehicles(session)
             await self.assign_idle_vehicles_to_packages(session, vehicles)
             await self.move_vehicles(session, vehicles)
             await self.perturb_congestion(session)
+            # Loads move slowly; recomputing every tick would be wasteful.
+            if self.tick_count % 10 == 0:
+                await self.refresh_node_loads(session)
             await session.commit()
         self.tick_count += 1
         if self.tick_count % 10 == 0:

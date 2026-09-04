@@ -14,7 +14,9 @@ export type ConnectionState = "connecting" | "open" | "closed" | "error";
 export function useLiveChannel<T>(channel: string, onMessage: (data: T) => void) {
   const [state, setState] = useState<ConnectionState>("connecting");
   const onMessageRef = useRef(onMessage);
-  onMessageRef.current = onMessage;
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  });
 
   useEffect(() => {
     let socket: WebSocket | null = null;
