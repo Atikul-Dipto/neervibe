@@ -107,17 +107,17 @@ async function main() {
     if (!byCity.has(n.city)) byCity.set(n.city, []);
     byCity.get(n.city).push(n);
   }
+  // A rider can start a leg from either of a city's hubs — which one depends on
+  // where the parcel was handed over, and a leg with no geometry falls back to
+  // a straight line, so both origins are generated.
   const lastMile = [];
   for (const [, group] of byCity) {
-    const pick = (...types) => types.map((t) => group.find((n) => n.node_type === t)).find(Boolean);
-    const deliveryHub = pick("DELIVERY_HUB", "HUB");
-    const localHub = pick("HUB", "DELIVERY_HUB");
-    for (const c of group.filter((n) => n.node_type === "CUSTOMER")) {
-      if (deliveryHub) lastMile.push([deliveryHub, c], [c, deliveryHub]);
-    }
-    for (const t of ["MERCHANT", "PICKUP_POINT"]) {
-      const n = group.find((x) => x.node_type === t);
-      if (localHub && n) lastMile.push([localHub, n], [n, localHub]);
+    const origins = group.filter((n) => n.node_type === "DELIVERY_HUB" || n.node_type === "HUB");
+    const doorsteps = group.filter((n) =>
+      n.node_type === "CUSTOMER" || n.node_type === "MERCHANT" || n.node_type === "PICKUP_POINT",
+    );
+    for (const hub of origins) {
+      for (const d of doorsteps) lastMile.push([hub, d], [d, hub]);
     }
   }
 
