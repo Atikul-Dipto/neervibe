@@ -343,12 +343,23 @@ class SimulationEngine:
         await self.redis.publish(redis_channels.PACKAGES, json.dumps(payload))
 
     async def perturb_congestion(self, session: AsyncSession) -> None:
+        """Drift congestion, risk and travel time on a few corridors per tick.
+
+        `self.edges` is loaded once at startup in a session that is then closed,
+        so these instances are detached: mutating them moves the simulator's own
+        travel times but writes nothing. Without the merge below, congestion sat
+        frozen at its seeded value in the database for every reader — the
+        corridor colours on the map, the Network page's congestion ranking, and
+        the detour model that asks how jammed a corridor is — while the Redis
+        channel carried values that disagreed with it.
+        """
         sample = random.sample(self.edges, k=min(5, len(self.edges)))
         for edge in sample:
             delta = random.uniform(-0.05, 0.07)
             edge.congestion_level = min(1.0, max(0.0, edge.congestion_level + delta))
             edge.risk_score = min(1.0, max(0.0, edge.congestion_level * 0.6 + random.uniform(0, 0.1)))
             edge.current_travel_time = round(edge.estimated_travel_time * (1 + edge.congestion_level))
+            await session.merge(edge)
             payload = {
                 "edge_id": str(edge.id),
                 "congestion_level": round(edge.congestion_level, 2),
