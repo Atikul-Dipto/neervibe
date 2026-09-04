@@ -25,7 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-from sqlalchemy import func, select
+from sqlalchemy import bindparam, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -601,12 +601,20 @@ class SimulationEngine:
         channel carried values that disagreed with it.
         """
         sample = random.sample(self.edges, k=min(5, len(self.edges)))
+        rows = []
         for edge in sample:
             delta = random.uniform(-0.05, 0.07)
             edge.congestion_level = min(1.0, max(0.0, edge.congestion_level + delta))
             edge.risk_score = min(1.0, max(0.0, edge.congestion_level * 0.6 + random.uniform(0, 0.1)))
             edge.current_travel_time = round(edge.estimated_travel_time * (1 + edge.congestion_level))
-            await session.merge(edge)
+            rows.append(
+                {
+                    "eid": edge.id,
+                    "cong": edge.congestion_level,
+                    "risk": edge.risk_score,
+                    "cur": edge.current_travel_time,
+                }
+            )
             payload = {
                 "edge_id": str(edge.id),
                 "congestion_level": round(edge.congestion_level, 2),
@@ -614,6 +622,21 @@ class SimulationEngine:
                 "current_travel_time": edge.current_travel_time,
             }
             await self.redis.publish(redis_channels.ROUTES, json.dumps(payload))
+
+        # One statement for the batch. `session.merge` per edge costs a SELECT
+        # and an UPDATE each, and the database is a region away from the app,
+        # so those round trips were a visible slice of every tick.
+        if rows:
+            await session.execute(
+                update(LogisticsEdge)
+                .where(LogisticsEdge.id == bindparam("eid"))
+                .values(
+                    congestion_level=bindparam("cong"),
+                    risk_score=bindparam("risk"),
+                    current_travel_time=bindparam("cur"),
+                ),
+                rows,
+            )
 
     async def assign_idle_vehicles_to_packages(self, session: AsyncSession, vehicles: list[Vehicle]) -> None:
         idle = [v for v in vehicles if v.status == VehicleStatus.IDLE or v.status == VehicleStatus.UNLOADING]
@@ -656,11 +679,19 @@ class SimulationEngine:
                 .group_by(LogisticsNode.id)
             )
         ).all()
+        changed = []
         for node_id, load in rows:
             node = self.nodes.get(node_id)
             if node is not None and node.current_load != load:
                 node.current_load = load
-                await session.merge(node)
+                changed.append({"nid": node_id, "load": load})
+        if changed:
+            await session.execute(
+                update(LogisticsNode)
+                .where(LogisticsNode.id == bindparam("nid"))
+                .values(current_load=bindparam("load")),
+                changed,
+            )
 
     async def tick(self) -> None:
         async with AsyncSessionLocal() as session:
